@@ -259,8 +259,8 @@
         if (!profile || profile.enabled === false) {
           return { ok: false, reason: `${id === 'maleSeller' ? 'Male' : 'Female'} Seller profile disabled` };
         }
-        if (!(profile.resolvedVoice || profile.voice)) {
-          return { ok: false, reason: `${id === 'maleSeller' ? 'Male' : 'Female'} Seller has no Piper voice` };
+        if (!(profile.resolvedVoice || profile.voice || profile.kokoroVoice)) {
+          return { ok: false, reason: `${id === 'maleSeller' ? 'Male' : 'Female'} Seller has no TTS voice` };
         }
       }
       return { ok: true };
@@ -341,9 +341,10 @@
         this.abort('seller profile disabled', 'interrupted');
         return;
       }
-      const voice = profile.resolvedVoice || profile.voice;
+      const engine = profile.resolvedEngine === 'kokoro' || profile.engine === 'kokoro' ? 'kokoro' : 'piper';
+      const voice = engine === 'kokoro' ? profile.resolvedVoice || profile.kokoroVoice : profile.resolvedVoice || profile.voice;
       if (!voice) {
-        this.abort('missing Piper voice', 'interrupted');
+        this.abort(`missing ${engine === 'kokoro' ? 'Kokoro' : 'Piper'} voice`, 'interrupted');
         return;
       }
 
@@ -351,8 +352,10 @@
       this.reportStatus(true);
       const ok = this.audio.enqueueTts(line.text, {
         priority: 2,
+        engine,
         language: profile.language === 'vi' ? 'vi' : 'en',
         voice,
+        piperVoice: profile.piperFallbackVoice || profile.voice,
         speed: Number(profile.speed) || 1,
         volume: profile.volume,
         profile: line.speaker,

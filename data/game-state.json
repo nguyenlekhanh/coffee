@@ -14,8 +14,10 @@
     "paused": false,
     "spawnRate": 1.25,
     "ttsEnabled": true,
+    "ttsEngine": "piper",
     "ttsLanguage": "en",
     "ttsVoice": "en_US-hfc_female-medium",
+    "ttsKokoroVoice": "af_heart",
     "ttsSpeed": 1,
     "ttsMaxChars": 120,
     "bgMusicEnabled": true,
@@ -30,7 +32,9 @@
     "maleSeller": {
       "id": "maleSeller",
       "enabled": true,
+      "engine": "kokoro",
       "voice": "en_US-arctic-medium",
+      "kokoroVoice": "am_adam",
       "language": "en",
       "speed": 1,
       "volume": 0.9
@@ -38,7 +42,9 @@
     "femaleSeller": {
       "id": "femaleSeller",
       "enabled": true,
+      "engine": "kokoro",
       "voice": "en_US-amy-medium",
+      "kokoroVoice": "af_heart",
       "language": "en",
       "speed": 1.05,
       "volume": 0.9
@@ -46,7 +52,9 @@
     "announcer": {
       "id": "announcer",
       "enabled": true,
+      "engine": "piper",
       "voice": "",
+      "kokoroVoice": "",
       "language": "en",
       "speed": 1,
       "volume": 0.9,
@@ -55,7 +63,9 @@
     "customer": {
       "id": "customer",
       "enabled": true,
+      "engine": "piper",
       "voice": "en_US-hfc_female-medium",
+      "kokoroVoice": "af_bella",
       "language": "en",
       "speed": 1,
       "volume": 0.85
@@ -1021,558 +1031,12 @@
     ],
     "history": [
       {
-        "runId": "run_1793648218517_6bww",
-        "conversationId": "weather_5",
-        "category": "weather",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:36:58.517Z",
-        "endedAt": "2026-11-02T19:37:09.519Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Hot day, cold drink, good music. That is the whole plan."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "You forgot friendly service."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "I was getting to that."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793648178026_m4fu",
-        "conversationId": "funny_5",
-        "category": "funny",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:36:18.026Z",
-        "endedAt": "2026-11-02T19:36:28.518Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "I named the mop Kevin."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Of course you did. Does Kevin get a break?"
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Kevin gets one bucket a day."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793648137026_ljvv",
-        "conversationId": "atmosphere_1",
-        "category": "atmosphere",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:35:37.026Z",
-        "endedAt": "2026-11-02T19:35:48.029Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "I love this little shop. The music, the ice, the chaos."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "It's home. With more straws."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "That's going on a mug."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793648096018_dyyf",
-        "conversationId": "funny_1",
-        "category": "funny",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:34:56.018Z",
-        "endedAt": "2026-11-02T19:35:07.019Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "I tried to take a nap behind the counter, but the blender had opinions."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "The blender is the real manager."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Then I want a raise."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793648054518_95ly",
-        "conversationId": "busy_4",
-        "category": "busy",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:34:14.518Z",
-        "endedAt": "2026-11-02T19:34:25.029Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Order up, order up! Who had the lemonade?"
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "That one's mine. Coming through!"
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Careful. The straw is armed."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793648013517_pcfo",
-        "conversationId": "weather_3",
-        "category": "weather",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:33:33.517Z",
-        "endedAt": "2026-11-02T19:33:44.518Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "The sun is doing the absolute most today."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "That's why we're the sunny side. We planned for this."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Somebody plan me a fan."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647971018_yiqv",
-        "conversationId": "busy_5",
-        "category": "busy",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:32:51.018Z",
-        "endedAt": "2026-11-02T19:33:03.025Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Everybody stay patient, we're getting to every order."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "We're working as fast as the blender allows."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "The blender is doing its best."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647929518_ilex",
-        "conversationId": "menu_3",
-        "category": "menu",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:32:09.518Z",
-        "endedAt": "2026-11-02T19:32:20.527Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "The menu board looks crooked again."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "It's not crooked. It's leaning into the summer theme."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "You're a genius."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647888516_r3tw",
-        "conversationId": "weekend_1",
-        "category": "weekend",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:31:28.516Z",
-        "endedAt": "2026-11-02T19:31:38.519Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "It's the weekend! You know what that means."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Long lines and extra cherries?"
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "You read my mind."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647842520_42a7",
-        "conversationId": "daily_2",
-        "category": "daily",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:30:42.520Z",
-        "endedAt": "2026-11-02T19:30:57.519Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Hey, quick question: are we a drink shop or a sunshine delivery service?"
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Why not both? We hand out the sunshine in cups."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "That's going on the sign. Sunshine, with ice."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647799216_zzq4",
-        "conversationId": "drinks_4",
-        "category": "drinks",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:29:59.216Z",
-        "endedAt": "2026-11-02T19:30:11.518Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Blue slushie or berry smoothie? Settle this for me."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Slushie for the vibes, smoothie for the actual fruit."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "So both. Got it."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647757517_1z2f",
-        "conversationId": "daily_6",
-        "category": "daily",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:29:17.517Z",
-        "endedAt": "2026-11-02T19:29:29.028Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "New day, fresh ice, same beautiful chaos."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "You say that like you did not forget to stock the cups."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "I stocked them. Eventually counts."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647717530_xx28",
-        "conversationId": "atmosphere_4",
-        "category": "atmosphere",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:28:37.530Z",
-        "endedAt": "2026-11-02T19:28:47.519Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "This is my favorite part of the day, right before the rush."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "You say that before every rush."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "It's always true."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647675525_y978",
-        "conversationId": "busy_1",
-        "category": "busy",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:27:55.525Z",
-        "endedAt": "2026-11-02T19:28:07.031Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Whoa, the queue is moving! I need backup."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Backup is here. I brought ice and attitude."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Perfect. We need both."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647611021_e1c6",
-        "conversationId": "weekend_3",
-        "category": "weekend",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:26:51.021Z",
-        "endedAt": "2026-11-02T19:27:24.528Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Weekend plans? Mine is making drinks and listening to you talk."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "That's not a plan, that's a job."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Best job I've had."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647567522_uiwq",
-        "conversationId": "daily_3",
-        "category": "daily",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:26:07.522Z",
-        "endedAt": "2026-11-02T19:26:20.027Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "I just organized the straws by color, and honestly? It's beautiful."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "You need a hobby, Marcus."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "I have a hobby. It's organizing straws."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647525023_wbam",
-        "conversationId": "daily_4",
-        "category": "daily",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:25:25.023Z",
-        "endedAt": "2026-11-02T19:25:37.027Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "First customer of the day gets my famous welcome speech."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Please don't do the robot again."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Too late. The robot is happening."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647478522_mpel",
-        "conversationId": "daily_5",
-        "category": "daily",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:24:38.522Z",
-        "endedAt": "2026-11-02T19:24:50.525Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "I think the syrup shelf is judging me."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "It's definitely the blue raspberry. It's been staring all morning."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "I'm moving it to the back."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647435022_w915",
-        "conversationId": "weekend_2",
-        "category": "weekend",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:23:55.022Z",
-        "endedAt": "2026-11-02T19:24:07.019Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Saturday energy in the shop today."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Saturdays get the good ice."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Every day gets the good ice. Don't tell the other days."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647389522_jmhi",
-        "conversationId": "daily_1",
-        "category": "daily",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:23:09.522Z",
-        "endedAt": "2026-11-02T19:23:23.524Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Morning, Sarah! The ice machine is already humming. That's a good sign."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "Best sound in the shop! I take it as a personal compliment."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Let's make today a busy one, then."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647346517_2w5q",
-        "conversationId": "atmosphere_6",
-        "category": "atmosphere",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:22:26.517Z",
-        "endedAt": "2026-11-02T19:22:38.019Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Listen to the ice settle. This shop has a soundtrack."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "You are one cup away from writing poetry."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "One cup and a very small notebook."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647306516_yi8r",
-        "conversationId": "funny_4",
-        "category": "funny",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:21:46.516Z",
-        "endedAt": "2026-11-02T19:21:56.020Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Why does the register beep so aggressively?"
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "It's excited about money."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "Same, honestly."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647240517_raw3",
-        "conversationId": "supporter_1",
-        "category": "supporter",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:20:40.517Z",
-        "endedAt": "2026-11-02T19:21:07.034Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Shout out to everyone who followed today. You are the best."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "We see you. We appreciate you."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647198517_nh44",
-        "conversationId": "busy_5",
-        "category": "busy",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:19:58.517Z",
-        "endedAt": "2026-11-02T19:20:10.022Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Everybody stay patient, we're getting to every order."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "We're working as fast as the blender allows."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "The blender is doing its best."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647156525_2amu",
-        "conversationId": "atmosphere_2",
-        "category": "atmosphere",
-        "status": "completed",
-        "startedAt": "2026-11-02T19:19:16.525Z",
-        "endedAt": "2026-11-02T19:19:27.030Z",
-        "lines": [
-          {
-            "speaker": "maleSeller",
-            "text": "Smell that? Fresh lemon and clean counter."
-          },
-          {
-            "speaker": "femaleSeller",
-            "text": "We should bottle that."
-          },
-          {
-            "speaker": "maleSeller",
-            "text": "We bottle the lemon. The counter stays."
-          }
-        ]
-      },
-      {
-        "runId": "run_1793647116016_mnct",
+        "runId": "run_1793655313511_l31q",
         "conversationId": "drinks_2",
         "category": "drinks",
         "status": "completed",
-        "startedAt": "2026-11-02T19:18:36.017Z",
-        "endedAt": "2026-11-02T19:18:46.523Z",
+        "startedAt": "2026-11-02T21:35:13.511Z",
+        "endedAt": "2026-11-02T21:35:26.013Z",
         "lines": [
           {
             "speaker": "maleSeller",
@@ -1589,12 +1053,12 @@
         ]
       },
       {
-        "runId": "run_1793647061017_4303",
+        "runId": "run_1793655279912_c0ab",
         "conversationId": "funny_6",
         "category": "funny",
         "status": "completed",
-        "startedAt": "2026-11-02T19:17:41.017Z",
-        "endedAt": "2026-11-02T19:17:59.022Z",
+        "startedAt": "2026-11-02T21:34:39.912Z",
+        "endedAt": "2026-11-02T21:34:59.293Z",
         "lines": [
           {
             "speaker": "maleSeller",
@@ -1611,56 +1075,210 @@
         ]
       },
       {
-        "runId": "run_1793647021017_200h",
-        "conversationId": "menu_3",
+        "runId": "run_1793655271512_161h",
+        "conversationId": "menu_2",
         "category": "menu",
         "status": "completed",
-        "startedAt": "2026-11-02T19:17:01.017Z",
-        "endedAt": "2026-11-02T19:17:11.019Z",
+        "startedAt": "2026-11-02T21:34:31.512Z",
+        "endedAt": "2026-11-02T21:34:43.019Z",
         "lines": [
           {
             "speaker": "maleSeller",
-            "text": "The menu board looks crooked again."
+            "text": "We should rename the mystery drink 'Trust Me.'"
           },
           {
             "speaker": "femaleSeller",
-            "text": "It's not crooked. It's leaning into the summer theme."
+            "text": "Absolutely not. People will think it's a dare."
           },
           {
             "speaker": "maleSeller",
-            "text": "You're a genius."
+            "text": "It is a dare. That's the fun part."
           }
         ]
       },
       {
-        "runId": "run_1793646978517_60tr",
-        "conversationId": "busy_4",
+        "runId": "run_1793655245411_derb",
+        "conversationId": "drinks_5",
+        "category": "drinks",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:34:05.411Z",
+        "endedAt": "2026-11-02T21:34:09.444Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I'm testing a new combo: orange soda with a splash of lemonade."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "That sounds either genius or a science experiment."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Those are my two favorite categories."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655226511_y4wx",
+        "conversationId": "weather_1",
+        "category": "weather",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:33:46.511Z",
+        "endedAt": "2026-11-02T21:34:00.514Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "It is officially hot enough to fry an egg on the sidewalk."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Let's not test that. Let's make lemonade instead."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Science can wait. Lemonade can't."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655211397_rshv",
+        "conversationId": "teasing_1",
+        "category": "teasing",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:33:31.397Z",
+        "endedAt": "2026-11-02T21:33:35.447Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "You've been humming the same song for an hour."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "It's a good song!"
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "It was. Twenty minutes ago."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655177512_4w9b",
+        "conversationId": "drinks_5",
+        "category": "drinks",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:32:57.512Z",
+        "endedAt": "2026-11-02T21:33:12.013Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I'm testing a new combo: orange soda with a splash of lemonade."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "That sounds either genius or a science experiment."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Those are my two favorite categories."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655176902_sh2f",
+        "conversationId": "busy_3",
         "category": "busy",
         "status": "completed",
-        "startedAt": "2026-11-02T19:16:18.517Z",
-        "endedAt": "2026-11-02T19:16:30.029Z",
+        "startedAt": "2026-11-02T21:32:56.902Z",
+        "endedAt": "2026-11-02T21:33:00.941Z",
         "lines": [
           {
             "speaker": "maleSeller",
-            "text": "Order up, order up! Who had the lemonade?"
+            "text": "We're getting slammed, and I love it."
           },
           {
             "speaker": "femaleSeller",
-            "text": "That one's mine. Coming through!"
+            "text": "Tell your face that. You look terrified."
           },
           {
             "speaker": "maleSeller",
-            "text": "Careful. The straw is armed."
+            "text": "This is my excited face."
           }
         ]
       },
       {
-        "runId": "run_1793646936517_g2r7",
+        "runId": "run_1793655143427_jgrf",
+        "conversationId": "atmosphere_6",
+        "category": "atmosphere",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:32:23.427Z",
+        "endedAt": "2026-11-02T21:32:26.939Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Listen to the ice settle. This shop has a soundtrack."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You are one cup away from writing poetry."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "One cup and a very small notebook."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655134510_4p3y",
+        "conversationId": "daily_3",
+        "category": "daily",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:32:14.510Z",
+        "endedAt": "2026-11-02T21:32:27.512Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I just organized the straws by color, and honestly? It's beautiful."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You need a hobby, Marcus."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I have a hobby. It's organizing straws."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655079058_e4ou",
+        "conversationId": "weekend_1",
+        "category": "weekend",
+        "status": "interrupted",
+        "startedAt": "2026-11-02T21:31:19.058Z",
+        "endedAt": "2026-11-02T21:31:40.015Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "It's the weekend! You know what that means."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Long lines and extra cherries?"
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "You read my mind."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655071011_wiai",
         "conversationId": "daily_4",
         "category": "daily",
         "status": "completed",
-        "startedAt": "2026-11-02T19:15:36.517Z",
-        "endedAt": "2026-11-02T19:15:48.035Z",
+        "startedAt": "2026-11-02T21:31:11.011Z",
+        "endedAt": "2026-11-02T21:31:40.015Z",
         "lines": [
           {
             "speaker": "maleSeller",
@@ -1673,6 +1291,402 @@
           {
             "speaker": "maleSeller",
             "text": "Too late. The robot is happening."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655031540_7wl3",
+        "conversationId": "drinks_4",
+        "category": "drinks",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:30:31.540Z",
+        "endedAt": "2026-11-02T21:30:45.605Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Blue slushie or berry smoothie? Settle this for me."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Slushie for the vibes, smoothie for the actual fruit."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "So both. Got it."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793655027512_gc6j",
+        "conversationId": "daily_6",
+        "category": "daily",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:30:27.512Z",
+        "endedAt": "2026-11-02T21:30:41.015Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "New day, fresh ice, same beautiful chaos."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You say that like you did not forget to stock the cups."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I stocked them. Eventually counts."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654979574_yf0s",
+        "conversationId": "busy_5",
+        "category": "busy",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:29:39.574Z",
+        "endedAt": "2026-11-02T21:30:01.090Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Everybody stay patient, we're getting to every order."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "We're working as fast as the blender allows."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "The blender is doing its best."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654939010_n3j2",
+        "conversationId": "quiet_6",
+        "category": "quiet",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:28:59.010Z",
+        "endedAt": "2026-11-02T21:29:56.514Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "What do you want to drink today, chat?"
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Pick something cold. It is a beautiful day for ice."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "And for a little friendly peer pressure."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654926530_1bvp",
+        "conversationId": "menu_2",
+        "category": "menu",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:28:46.530Z",
+        "endedAt": "2026-11-02T21:28:58.616Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "We should rename the mystery drink 'Trust Me.'"
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Absolutely not. People will think it's a dare."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "It is a dare. That's the fun part."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654893012_pxjo",
+        "conversationId": "atmosphere_4",
+        "category": "atmosphere",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:28:13.012Z",
+        "endedAt": "2026-11-02T21:28:24.517Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "This is my favorite part of the day, right before the rush."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You say that before every rush."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "It's always true."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654887900_27qn",
+        "conversationId": "daily_1",
+        "category": "daily",
+        "status": "interrupted",
+        "startedAt": "2026-11-02T21:28:07.900Z",
+        "endedAt": "2026-11-02T21:28:13.019Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Morning, Sarah! The ice machine is already humming. That's a good sign."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Best sound in the shop! I take it as a personal compliment."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Let's make today a busy one, then."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654827373_clkv",
+        "conversationId": "daily_3",
+        "category": "daily",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:27:07.373Z",
+        "endedAt": "2026-11-02T21:27:11.407Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I just organized the straws by color, and honestly? It's beautiful."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You need a hobby, Marcus."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I have a hobby. It's organizing straws."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654793383_r4v2",
+        "conversationId": "drinks_3",
+        "category": "drinks",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:26:33.383Z",
+        "endedAt": "2026-11-02T21:26:36.901Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "If you could only drink one thing from the menu forever?"
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Easy. Iced coffee. I have things to do."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Everything except sleep, apparently."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654762597_wqrs",
+        "conversationId": "daily_5",
+        "category": "daily",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:26:02.597Z",
+        "endedAt": "2026-11-02T21:26:15.600Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I think the syrup shelf is judging me."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "It's definitely the blue raspberry. It's been staring all morning."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I'm moving it to the back."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654748401_71jy",
+        "conversationId": "busy_1",
+        "category": "busy",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:25:48.401Z",
+        "endedAt": "2026-11-02T21:25:52.918Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Whoa, the queue is moving! I need backup."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Backup is here. I brought ice and attitude."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Perfect. We need both."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654717106_33kd",
+        "conversationId": "daily_1",
+        "category": "daily",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:25:17.106Z",
+        "endedAt": "2026-11-02T21:25:31.112Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Morning, Sarah! The ice machine is already humming. That's a good sign."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Best sound in the shop! I take it as a personal compliment."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Let's make today a busy one, then."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654714388_x7mr",
+        "conversationId": "atmosphere_5",
+        "category": "atmosphere",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:25:14.388Z",
+        "endedAt": "2026-11-02T21:25:18.430Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Good drinks, good people, good music. Not a bad way to spend a day."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "And the best coworker."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I wasn't going to say it, but yes."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654679399_9729",
+        "conversationId": "busy_3",
+        "category": "busy",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:24:39.399Z",
+        "endedAt": "2026-11-02T21:24:43.926Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "We're getting slammed, and I love it."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Tell your face that. You look terrified."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "This is my excited face."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654679068_anzg",
+        "conversationId": "teasing_5",
+        "category": "teasing",
+        "status": "interrupted",
+        "startedAt": "2026-11-02T21:24:39.068Z",
+        "endedAt": "2026-11-02T21:24:39.443Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I fixed the shelf."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You put a book under it."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "A very stable book."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654646378_cg8k",
+        "conversationId": "busy_2",
+        "category": "busy",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:24:06.378Z",
+        "endedAt": "2026-11-02T21:24:09.416Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Three orders at once. Stay with me, Sarah."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "I've got the smoothies. You take the coffees."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Teamwork makes the drinks work."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654636622_v6yi",
+        "conversationId": "menu_1",
+        "category": "menu",
+        "status": "interrupted",
+        "startedAt": "2026-11-02T21:23:56.622Z",
+        "endedAt": "2026-11-02T21:24:06.432Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Somebody asked if we have anything warm."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "We have a warm personality and a hot coffee machine."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I'll put that on the menu."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793654611889_0vwu",
+        "conversationId": "drinks_2",
+        "category": "drinks",
+        "status": "completed",
+        "startedAt": "2026-11-02T21:23:31.889Z",
+        "endedAt": "2026-11-02T21:23:36.405Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I made a lemonade so fresh it slapped me."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "That's not how lemonade works."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Tell that to my face. It's still recovering."
           }
         ]
       }
@@ -1696,7 +1710,7 @@
       "maxPending": 6,
       "timeoutMs": 8000,
       "dedupeSeconds": 45,
-      "savedAt": "2026-11-02T19:18:59.155Z"
+      "savedAt": "2026-11-02T20:33:37.052Z"
     },
     "llmManager": {
       "version": 1,
@@ -1715,7 +1729,7 @@
           "reasoningMode": "auto",
           "headers": {},
           "createdAt": "2026-11-02T19:14:56.850Z",
-          "updatedAt": "2026-11-02T19:37:08.253Z"
+          "updatedAt": "2026-11-02T21:35:15.830Z"
         },
         {
           "id": "tokenrouter",
@@ -1731,7 +1745,7 @@
           "reasoningMode": "auto",
           "headers": {},
           "createdAt": "2026-11-02T19:14:56.850Z",
-          "updatedAt": "2026-11-02T19:37:08.253Z"
+          "updatedAt": "2026-11-02T21:35:15.830Z"
         }
       ],
       "primaryProviderId": "openrouter",

@@ -12,25 +12,132 @@
   if (isAdminMode) document.body.classList.remove('obs-mode');
   
   // ---------------------------------------------------------------- stage fit
+  // The scene is authored in a fixed 1080 x 1920 coordinate space. Only the
+  // complete stage is scaled; the game/canvas resolution never follows the
+  // browser viewport.
+  const STAGE_WIDTH = 1080;
+  const STAGE_HEIGHT = 1920;
   const stageWrapper = $('stageWrapper');
   const stage9x16 = $('stage9x16');
+  const workspace = stageWrapper ? stageWrapper.closest('.app-workspace') : null;
+  let fitScheduled = 0;
+  let stageScale = 1;
+  let renderScale = 1;
+
+  function viewportSize() {
+    return {
+      // The layout viewport is what TikTok's link/browser source allocates.
+      // visualViewport can lag behind a CDP/webview resize (or reflect pinch
+      // zoom), so it is only a fallback here.
+      width: Math.max(1, Math.floor(window.innerWidth || document.documentElement.clientWidth || 0)),
+      height: Math.max(1, Math.floor(window.innerHeight || document.documentElement.clientHeight || 0))
+    };
+  }
+
+  // Backing-store density is tied to the physical size of the stage, not to
+  // the viewport. This keeps 1080p display output 1:1 while avoiding a 4K
+  // canvas when the stage is displayed at 540 CSS pixels.
+  function applyCanvasResolution(scale) {
+    const dpr = Math.max(1, Math.min(2, Number(window.devicePixelRatio) || 1));
+    const nextRenderScale = Math.min(2, Math.max(1, dpr * scale));
+    const width = Math.round(STAGE_WIDTH * nextRenderScale);
+    const height = Math.round(STAGE_HEIGHT * nextRenderScale);
+    for (const canvas of [$('gameCanvas'), $('fxCanvas')]) {
+      if (!canvas) continue;
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      canvas.style.width = `${STAGE_WIDTH}px`;
+      canvas.style.height = `${STAGE_HEIGHT}px`;
+      canvas.dataset.renderScale = String(nextRenderScale);
+    }
+    renderScale = nextRenderScale;
+    return nextRenderScale;
+  }
+
   function fitStage() {
+    fitScheduled = 0;
     if (!stageWrapper || !stage9x16) return;
+
+    const viewport = viewportSize();
     const obs = document.body.classList.contains('obs-mode');
-    const stacked = !obs && window.innerWidth < 1000;
+    const stacked = !obs && viewport.width < 1000;
     document.body.classList.toggle('stacked', stacked);
 
-    const dock = $('quickDock');
-    const dockWidth = obs || stacked ? 0 : (dock ? dock.offsetWidth + 22 : 0);
-    const availWidth = Math.max(180, window.innerWidth - dockWidth - (stacked ? 16 : 44));
-    const availHeight = Math.max(180, window.innerHeight * (obs ? 1 : stacked ? 0.63 : 0.96) - 24);
-    const width = Math.min(availWidth, (availHeight * 9) / 16);
+    const box = workspace ? workspace.getBoundingClientRect() : { width: viewport.width, height: viewport.height };
+    const styles = workspace ? getComputedStyle(workspace) : null;
+    const padX = styles ? (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0) : 0;
+    const padY = styles ? (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0) : 0;
+    // The host can report a fractional layout width (e.g. 430.4 for a 430 px
+    // webview). Never let that half-pixel turn into clipping at the source.
+    let availableWidth = Math.max(1, Math.min(viewport.width, box.width - padX));
+    let availableHeight = Math.max(1, Math.min(viewport.height, box.height - padY));
 
-    stageWrapper.style.width = `${width}px`;
-    stageWrapper.style.height = `${(width * 16) / 9}px`;
-    stage9x16.style.transform = `scale(${width / 1080})`;
+    // The public/OBS view is a pure link source: use every pixel it gives us.
+    // The admin preview keeps room for its dock without changing stage math.
+    const dock = $('quickDock');
+    const dockVisible = Boolean(dock && !obs && dock.offsetWidth > 0 && getComputedStyle(dock).display !== 'none');
+    if (dockVisible) {
+      if (stacked) availableHeight = Math.max(1, availableHeight - dock.offsetHeight - 10);
+      else availableWidth = Math.max(1, availableWidth - dock.offsetWidth - 22);
+    }
+
+    const scale = Math.min(availableWidth / STAGE_WIDTH, availableHeight / STAGE_HEIGHT);
+    if (!Number.isFinite(scale) || scale <= 0) return;
+
+    stageScale = scale;
+    const stageWidth = STAGE_WIDTH * scale;
+    const stageHeight = STAGE_HEIGHT * scale;
+    stageWrapper.style.width = `${stageWidth}px`;
+    stageWrapper.style.height = `${stageHeight}px`;
+    // In a public/TikTok browser source the flex parent can be a fractional
+    // pixel wider than the real viewport. Anchor the stage to the viewport so
+    // centering cannot leave a sliver outside the source bounds.
+    if (obs) {
+      stageWrapper.style.position = 'absolute';
+      stageWrapper.style.left = `${Math.max(0, (viewport.width - stageWidth) / 2)}px`;
+      stageWrapper.style.top = `${Math.max(0, (viewport.height - stageHeight) / 2)}px`;
+    } else {
+      stageWrapper.style.position = '';
+      stageWrapper.style.left = '';
+      stageWrapper.style.top = '';
+    }
+    stage9x16.style.transform = `scale(${scale})`;
+    stage9x16.style.setProperty('--stage-scale', String(scale));
+    applyCanvasResolution(scale);
+
+    window.shopStageInfo = {
+      logicalWidth: STAGE_WIDTH,
+      logicalHeight: STAGE_HEIGHT,
+      scale,
+      renderScale,
+      viewport: { width: viewport.width, height: viewport.height },
+      stage: { width: stageWidth, height: stageHeight },
+      canvas: {
+        width: $('gameCanvas') ? $('gameCanvas').width : 0,
+        height: $('gameCanvas') ? $('gameCanvas').height : 0
+      }
+    };
   }
-  window.addEventListener('resize', fitStage);
+
+  // A single queued fit avoids stacking resize work or creating a second RAF
+  // loop. ResizeObserver covers TikTok/Cloudflare webviews that do not emit a
+  // normal window resize after their link source is attached.
+  function scheduleFit() {
+    if (fitScheduled) return;
+    fitScheduled = requestAnimationFrame(fitStage);
+  }
+
+  if (workspace && window.ResizeObserver) {
+    const resizeObserver = new ResizeObserver(scheduleFit);
+    resizeObserver.observe(workspace);
+    const dock = $('quickDock');
+    if (dock) resizeObserver.observe(dock);
+  }
+  window.addEventListener('resize', scheduleFit, { passive: true });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', scheduleFit, { passive: true });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleFit);
   fitStage();
 
   // ------------------------------------------------------------------ engines
@@ -444,8 +551,14 @@
       if (typeof st.settings.sfxVolume === 'number') audio.setSfxVolume(st.settings.sfxVolume);
       audio.setMusicEnabled(st.settings.bgMusicEnabled !== false);
       audio.ttsEnabled = st.settings.ttsEnabled !== false;
+      if (st.settings.ttsEngine === 'kokoro' || st.settings.ttsEngine === 'piper') {
+        audio.ttsEngine = st.settings.ttsEngine;
+      }
       if (typeof st.settings.ttsLanguage === 'string') audio.ttsLanguage = st.settings.ttsLanguage;
       if (typeof st.settings.ttsVoice === 'string' && st.settings.ttsVoice) audio.ttsVoice = st.settings.ttsVoice;
+      if (typeof st.settings.ttsKokoroVoice === 'string' && st.settings.ttsKokoroVoice) {
+        audio.ttsKokoroVoice = st.settings.ttsKokoroVoice;
+      }
       if (typeof st.settings.ttsSpeed === 'number') audio.ttsSpeed = st.settings.ttsSpeed;
       // Announcements stop with the shop, and never talk over a paused game.
       if (announcer && st.tts) announcer.setVoiceCatalog(st.tts.catalog || st.tts.voices);
@@ -651,7 +764,9 @@
       // The profile snapshot was resolved on the server when the event was
       // created, so later profile edits cannot change this queued line.
       audio.enqueueTts(ev.ttsText, {
+        engine: ev.ttsEngine,
         voice: ev.ttsVoice,
+        piperVoice: ev.ttsPiperFallbackVoice,
         language: ev.ttsLanguage,
         speed: ev.ttsSpeed,
         volume: ev.ttsVolume,
@@ -663,9 +778,16 @@
   }
 
   // ------------------------------------------------------------------- socket
+  function resolveWebSocketUrl() {
+    // Keep this origin-relative so Cloudflare Quick Tunnel and direct LAN/page
+    // URLs both work: HTTPS pages get wss:, HTTP pages get ws:.
+    const url = new URL('/ws', window.location.href);
+    url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return url.href;
+  }
+
   function connectWebSocket() {
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${window.location.host}/ws`);
+    ws = new WebSocket(resolveWebSocketUrl());
 
     ws.onmessage = (event) => {
       let msg;
@@ -714,7 +836,9 @@
         if (msg.params && msg.params.url) {
           if (conversations) conversations.notifyPriority('viewer');
           audio.enqueueTts(msg.params.text || 'Welcome to Sunny Side Sips!', {
+            engine: msg.params.engine,
             voice: msg.params.voice,
+            piperVoice: msg.params.piperVoice,
             language: msg.params.language,
             speed: msg.params.speed,
             volume: msg.params.volume,

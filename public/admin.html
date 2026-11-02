@@ -127,6 +127,16 @@
     .voice-name { flex: 0 0 110px; }
     .voice-gender { flex: 0 0 88px; font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
     .voice-path { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .engine-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 10px 0; }
+    .engine-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,0.035); }
+    .engine-card.ready { border-color: #69c58d; }
+    .engine-card.offline { border-color: #e37d6b; }
+    .engine-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+    .engine-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #e37d6b; box-shadow: 0 0 0 3px rgba(227,125,107,0.12); }
+    .engine-card.ready .engine-dot { background: #69c58d; box-shadow: 0 0 0 3px rgba(105,197,141,0.12); }
+    .engine-meta { font-size: 10.8px; color: var(--ink-soft); line-height: 1.55; }
+    .audition-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+    .audition-row > div { flex: 1 1 180px; }
     .vp-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
     @media (max-width: 1080px) { .vp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 640px) { .vp-grid { grid-template-columns: 1fr; } }
@@ -308,7 +318,21 @@
       </section>
 
       <section class="card">
-        <h2>🎙️ 4. Piper Voice</h2>
+        <h2>🎙️ 4. TTS Engine</h2>
+        <div class="row">
+          <div>
+            <div class="label-line"><span>Speech engine</span></div>
+            <select id="ttsEngine">
+              <option value="piper">Piper · local ONNX</option>
+              <option value="kokoro">Kokoro · local neural</option>
+            </select>
+          </div>
+          <button class="btn" id="btnRefreshVoices">🔄 Refresh engine</button>
+          <button class="btn gold" id="btnTestEngine">🔊 Test engine</button>
+          <span class="hint" id="voiceSummary" style="flex: 1 1 240px; align-self: center">Scanning local engines…</span>
+        </div>
+        <div class="engine-grid" id="ttsEngineStatus"></div>
+        <div class="hint" id="ttsEngineMetrics">Loading engine status…</div>
         <div class="row">
           <div>
             <div class="label-line"><span>Language</span></div>
@@ -327,8 +351,7 @@
           </div>
         </div>
         <div class="row">
-          <button class="btn" id="btnRefreshVoices">🔄 Refresh Piper Voices</button>
-          <span class="hint" id="voiceSummary" style="flex: 1 1 240px; align-self: center">Scanning config/piper…</span>
+          <span class="hint" id="engineVoiceCount" style="flex: 1 1 240px; align-self: center"></span>
         </div>
         <div class="hint" id="voiceDetail">Select a voice to see its model file, gender and status.</div>
         <div class="voice-list" id="voiceList"></div>
@@ -345,7 +368,28 @@
           <button class="btn gold" id="btnSpeak">Test voice</button>
         </div>
         <audio id="audioPreview" controls style="width: 100%; height: 38px;"></audio>
-        <div class="hint" id="ttsHint">Piper runs locally from config/piper — no models are downloaded.</div>
+        <div class="hint" id="ttsHint">Both engines run locally. Kokoro uses the isolated .venv-kokoro worker and falls back to Piper if it is unavailable.</div>
+      </section>
+
+      <section class="card" id="kokoroAuditionCard">
+        <h2>🎧 KOKORO VOICE AUDITION</h2>
+        <div class="audition-row">
+          <div>
+            <div class="label-line"><span>Kokoro voice</span></div>
+            <select id="auditionVoice"></select>
+          </div>
+          <div style="flex: 2 1 320px">
+            <div class="label-line"><span>Custom English text</span></div>
+            <input type="text" id="auditionText" value="Welcome to Sunny Side Sips! Fresh drinks, warm smiles, and the sunny side of your day." />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn gold" id="btnAuditionGenerate">🎧 Generate &amp; play</button>
+          <button class="btn" id="btnAuditionSellers">⚖️ Compare Male / Female</button>
+          <button class="btn" id="btnAuditionEngines">⚖️ Compare Piper / Kokoro</button>
+          <span class="hint" id="auditionHint">Select a Kokoro voice or compare profiles. Generation uses the same local WAV cache as live speech.</span>
+        </div>
+        <audio id="auditionAudio" controls style="width: 100%; height: 38px;"></audio>
       </section>
 
       <section class="card" style="grid-column: 1 / -1">
@@ -355,13 +399,13 @@
             <div class="label-line"><span>Voice preview text</span></div>
             <input type="text" id="vpPreviewText" value="Welcome to Sunny Side Sips! Fresh drinks, sunny vibes, all day long." />
           </div>
-          <button class="btn" id="btnVoiceProfilesRefresh" style="align-self: flex-end">🔄 Rescan voices</button>
+          <button class="btn" id="btnVoiceProfilesRefresh" style="align-self: flex-end">🔄 Refresh engine voices</button>
           <button class="btn danger" id="btnVoiceProfilesReset" style="align-self: flex-end">↺ Restore Default Settings</button>
         </div>
         <div class="hint" id="vpStatus">Loading voice profiles…</div>
         <div class="vp-grid" id="vpGrid"></div>
         <audio id="vpAudio" controls style="width: 100%; height: 38px;"></audio>
-        <div class="hint" id="vpPitchNote">Pitch is not supported by the installed Piper engine.</div>
+        <div class="hint" id="vpPitchNote">Pitch is not exposed by either local engine — no simulated pitch is applied.</div>
       </section>
 
       <section class="card" style="grid-column: 1 / -1">
@@ -855,8 +899,11 @@
     };
 
     let ttsVoices = [];
+    let kokoroVoices = [];
+    let ttsState = null;
     let ttsCatalog = { en: [], vi: [], vn: [] };
     let lastVoiceSignature = '';
+    let lastKokoroSignature = '';
     let voiceHintUntil = 0;
     let ttsEnabled = true;
 
@@ -872,15 +919,25 @@
       return `${voice.name}${gender}${unavailable}`;
     }
 
+    function activeTtsEngine() {
+      const select = document.getElementById('ttsEngine');
+      return select && select.value === 'kokoro' ? 'kokoro' : 'piper';
+    }
+
+    function engineVoices(engine = activeTtsEngine()) {
+      return engine === 'kokoro' ? kokoroVoices : ttsVoices;
+    }
+
     function voiceFor(id) {
-      return ttsVoices.find((voice) => voice.id === id) || null;
+      return engineVoices().find((voice) => voice.id === id) || null;
     }
 
     function renderVoiceOptions() {
-      const language = document.getElementById('ttsLanguage').value;
+      const engine = activeTtsEngine();
+      const language = engine === 'kokoro' ? 'en' : document.getElementById('ttsLanguage').value;
       const select = document.getElementById('ttsVoice');
       const previous = select.value;
-      const list = ttsVoices.filter((voice) => voice.language === language);
+      const list = engineVoices(engine).filter((voice) => voice.language === language);
       select.innerHTML = list.length
         ? list
             .map(
@@ -888,8 +945,13 @@
                 `<option value="${escapeHtml(voice.id)}"${voice.valid === false ? ' disabled' : ''}>${escapeHtml(voiceOptionLabel(voice))}</option>`
             )
             .join('')
-        : '<option value="">No model in config/piper</option>';
-      const wanted = [previous, select.dataset.setting, list[0] && list[0].id].find(
+        : `<option value="">No ${engine === 'kokoro' ? 'Kokoro' : 'Piper'} voice available</option>`;
+      const saved = ttsState && ttsState.selectedEngine === engine
+        ? engine === 'kokoro'
+          ? ttsState.kokoroVoice
+          : ttsState.voice
+        : null;
+      const wanted = [previous, saved, list[0] && list[0].id].find(
         (id) => id && list.some((voice) => voice.id === id && voice.valid !== false)
       );
       if (wanted) select.value = wanted;
@@ -900,20 +962,22 @@
       const select = document.getElementById('ttsVoice');
       const voice = voiceFor(select.value);
       const detail = document.getElementById('voiceDetail');
+      const engine = activeTtsEngine();
       if (!detail) return;
       detail.textContent = voice
         ? `${voice.name} · ${genderLabel(voice.gender)} · ` +
           (voice.valid === false
             ? 'UNAVAILABLE: ' + (voice.problem || 'cannot load')
-            : voice.path || 'model inside config/piper')
-        : 'No Piper model found for this language.';
+            : engine === 'kokoro' ? 'Kokoro local model · data/kokoro-cache' : voice.path || 'model inside config/piper')
+        : `No ${engine === 'kokoro' ? 'Kokoro' : 'Piper'} model found for this language.`;
     }
 
     function renderVoiceList() {
       const wrap = document.getElementById('voiceList');
       if (!wrap) return;
-      const language = document.getElementById('ttsLanguage').value;
-      const list = ttsVoices.filter((voice) => voice.language === language);
+      const engine = activeTtsEngine();
+      const language = engine === 'kokoro' ? 'en' : document.getElementById('ttsLanguage').value;
+      const list = engineVoices(engine).filter((voice) => voice.language === language);
       wrap.innerHTML = list.length
         ? list
             .map(
@@ -926,7 +990,7 @@
           </div>`
             )
             .join('')
-        : '<div class="hint">No voice models for this language yet.</div>';
+        : `<div class="hint">No ${engine === 'kokoro' ? 'Kokoro' : 'Piper'} voice models for this language yet.</div>`;
       wrap.querySelectorAll('[data-voice-test]').forEach((btn) => {
         btn.onclick = () => speakWithVoice(btn.getAttribute('data-voice-test'));
       });
@@ -935,12 +999,15 @@
     function renderVoiceSummary(status) {
       const summary = document.getElementById('voiceSummary');
       if (!summary) return;
-      const en = ttsVoices.filter((voice) => voice.language === 'en').length;
-      const vi = ttsVoices.filter((voice) => voice.language === 'vi').length;
-      const invalid = ttsVoices.filter((voice) => voice.valid === false).length;
+      const engine = activeTtsEngine();
+      const list = engineVoices(engine);
+      const en = list.filter((voice) => voice.language === 'en').length;
+      const vi = list.filter((voice) => voice.language === 'vi').length;
+      const invalid = list.filter((voice) => voice.valid === false).length;
       const scanned = status && status.lastScanAt ? new Date(status.lastScanAt).toLocaleTimeString() : '—';
       summary.textContent =
-        `${ttsVoices.length} discovered · English ${en} · Vietnamese ${vi}` +
+        `${engine === 'kokoro' ? 'Kokoro' : 'Piper'} · ${list.length} voices · English ${en}` +
+        (engine === 'piper' ? ` · Vietnamese ${vi}` : '') +
         (invalid ? ` · ${invalid} unavailable` : '') +
         ` · scanned ${scanned}`;
     }
@@ -964,6 +1031,16 @@
 
     function syncVoiceData(tts) {
       if (!tts) return;
+      ttsState = tts;
+      const engineSelect = document.getElementById('ttsEngine');
+      if (engineSelect && (tts.selectedEngine === 'piper' || tts.selectedEngine === 'kokoro')) {
+        engineSelect.value = tts.selectedEngine;
+      }
+      const languageSelect = document.getElementById('ttsLanguage');
+      if (languageSelect) {
+        languageSelect.disabled = activeTtsEngine() === 'kokoro';
+        if (activeTtsEngine() === 'kokoro') languageSelect.value = 'en';
+      }
       const voices = Array.isArray(tts.voices) ? tts.voices : [];
       const signature = voices
         .map((voice) => `${voice.id}:${voice.gender || ''}:${voice.valid === false ? 0 : 1}`)
@@ -975,6 +1052,20 @@
         renderVoiceList();
         populateAnnVoiceOptions();
       }
+      const kokoro = (tts.kokoro) || (tts.engines && tts.engines.kokoro);
+      if (kokoro && Array.isArray(kokoro.voices)) {
+        const signature = kokoro.voices
+          .map((voice) => `${voice.id}:${voice.valid === false ? 0 : 1}`)
+          .join('|');
+        if (signature !== lastKokoroSignature) {
+          lastKokoroSignature = signature;
+          kokoroVoices = kokoro.voices.map((voice) => ({ ...voice }));
+          renderKokoroAudition();
+        }
+      }
+      renderEngineStatus(tts);
+      renderVoiceOptions();
+      renderVoiceList();
       if (tts.catalog) {
         ttsCatalog = tts.catalog;
         renderVoiceSummary(tts.catalog);
@@ -983,7 +1074,144 @@
       }
     }
 
+    function renderEngineStatus(tts) {
+      const wrap = document.getElementById('ttsEngineStatus');
+      if (!wrap) return;
+      const engines = tts && tts.engines ? tts.engines : {};
+      const piper = engines.piper || tts.piper || {};
+      const kokoro = engines.kokoro || tts.kokoro || {};
+      const card = (id, label, state) => {
+        const ready = Boolean(state.ready);
+        const status = String(state.status || (ready ? 'ready' : 'offline')).toUpperCase();
+        return `<div class="engine-card ${ready ? 'ready' : 'offline'}">
+          <div class="engine-head"><strong><span class="engine-dot"></span> ${escapeHtml(label)}</strong><span class="hint">${escapeHtml(status)}</span></div>
+          <div class="engine-meta">${
+            id === 'kokoro'
+              ? `${escapeHtml(state.device || 'cpu')} · ${escapeHtml(String((state.voices || []).length))} voices · load ${state.loadMs ? Math.round(state.loadMs) + ' ms' : '—'}`
+              : `${escapeHtml(String((state.voices || []).length))} voices · ${escapeHtml(state.executableKind || 'worker')}`
+          }</div>
+          <div class="engine-meta">${escapeHtml(state.error || state.lastError || 'No engine error')}</div>
+        </div>`;
+      };
+      wrap.innerHTML = card('piper', 'Piper', piper) + card('kokoro', 'Kokoro', kokoro);
+      const metrics = document.getElementById('ttsEngineMetrics');
+      if (metrics) {
+        const parts = [];
+        if (kokoro.ready) {
+          parts.push(`Kokoro ${kokoro.device || 'cpu'} · last ${kokoro.lastGenerationMs != null ? kokoro.lastGenerationMs + ' ms' : '—'}`);
+          parts.push(`cache hits ${kokoro.cacheHits || 0} · failures ${kokoro.failures || 0}`);
+          if (kokoro.lastDurationSec) parts.push(`audio ${kokoro.lastDurationSec}s`);
+        } else if (kokoro.error) {
+          parts.push(`Kokoro offline: ${kokoro.error}`);
+        }
+        parts.push(`Piper ${piper.ready ? 'ready' : piper.status || 'offline'}`);
+        parts.push('Fallback: Kokoro → profile Piper voice');
+        metrics.textContent = parts.join(' · ');
+      }
+      const count = document.getElementById('engineVoiceCount');
+      if (count) {
+        count.textContent = activeTtsEngine() === 'kokoro'
+          ? `${kokoroVoices.length} Kokoro voices · US English · 24 kHz mono WAV`
+          : `${ttsVoices.length} Piper voices · ${ttsVoices.filter((voice) => voice.language === 'vi').length} Vietnamese`;
+      }
+      renderKokoroAudition();
+    }
+
+    function renderKokoroAudition() {
+      const select = document.getElementById('auditionVoice');
+      if (!select) return;
+      const previous = select.value;
+      select.innerHTML = kokoroVoices.length
+        ? kokoroVoices
+            .map(
+              (voice) =>
+                `<option value="${escapeHtml(voice.id)}">${escapeHtml(voice.name)} · ${escapeHtml(genderLabel(voice.gender))}</option>`
+            )
+            .join('')
+        : '<option value="">Waiting for Kokoro worker…</option>';
+      const wanted = [previous, 'af_heart', kokoroVoices[0] && kokoroVoices[0].id].find((id) =>
+        kokoroVoices.some((voice) => voice.id === id)
+      );
+      if (wanted) select.value = wanted;
+      const hint = document.getElementById('auditionHint');
+      if (hint && !hint.dataset.locked) {
+        hint.textContent = kokoroVoices.length
+          ? `${kokoroVoices.length} Kokoro voices available · 24 kHz mono WAV · generation runs in the local worker.`
+          : 'Kokoro is still loading. Piper remains available in the meantime.';
+      }
+    }
+
+    function playAuditionUrl(url) {
+      return new Promise((resolve) => {
+        const player = document.getElementById('auditionAudio');
+        if (!player) return resolve();
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          player.onended = null;
+          player.onerror = null;
+          resolve();
+        };
+        player.onended = finish;
+        player.onerror = finish;
+        player.src = url;
+        player.play().catch(() => {
+          const hint = document.getElementById('auditionHint');
+          if (hint) hint.textContent = 'Audio generated. Press play on the player above to audition it.';
+          finish();
+        });
+        setTimeout(finish, 30000);
+      });
+    }
+
+    async function auditionClip(engine, voice, text, label) {
+      const hint = document.getElementById('auditionHint');
+      if (hint) {
+        hint.dataset.locked = '1';
+        hint.textContent = `Generating ${label} with ${engine === 'kokoro' ? 'Kokoro' : 'Piper'}…`;
+      }
+      const data = await sendRpc('tts.test', {
+        engine,
+        voice,
+        text,
+        speed: Number(document.getElementById('sliderSpeed').value) / 100,
+        allowFallback: false
+      });
+      const result = data && data.result;
+      if (!result || !result.ok || !result.url) {
+        if (hint) {
+          delete hint.dataset.locked;
+          hint.textContent = `${label} failed: ${
+            (result && result.error) || (data && data.error && data.error.message) || 'unknown error'
+          }`;
+        }
+        return false;
+      }
+      if (hint) {
+        const ms = result.latencyMs != null ? result.latencyMs : result.synthSec != null ? Math.round(result.synthSec * 1000) : null;
+        hint.textContent =
+          `${label} · ${result.voice} · ${Number(result.speed).toFixed(2)}× · ` +
+          (result.cached ? 'cache hit' : ms != null ? `${ms} ms generation` : 'generated') +
+          (result.durationSec ? ` · ${result.durationSec}s audio` : '');
+      }
+      await playAuditionUrl(result.url);
+      if (hint) delete hint.dataset.locked;
+      return true;
+    }
+
+    async function runAudition(sequence, label) {
+      const hint = document.getElementById('auditionHint');
+      const text = document.getElementById('auditionText').value.trim() || 'Welcome to Sunny Side Sips!';
+      for (const clip of sequence) {
+        const ok = await auditionClip(clip.engine, clip.voice, text, clip.label || label);
+        if (!ok) return;
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+    }
+
     async function speakWithVoice(voiceId) {
+      const engine = activeTtsEngine();
       const voice = voiceFor(voiceId);
       if (!voice) return;
       const hint = document.getElementById('ttsHint');
@@ -993,19 +1221,20 @@
         return;
       }
       document.getElementById('ttsVoice').value = voice.id;
-      document.getElementById('ttsLanguage').value = voice.language;
+      if (engine === 'piper') document.getElementById('ttsLanguage').value = voice.language;
       renderVoiceDetail();
       renderVoiceList();
       const text = document.getElementById('ttsText').value.trim() || 'Welcome to Sunny Side Sips!';
       const speed = Number(document.getElementById('sliderSpeed').value) / 100;
-      hint.textContent = `Synthesizing ${voice.name} from ${voice.path || 'config/piper'}…`;
+      hint.textContent = `Synthesizing ${voice.name} with ${engine === 'kokoro' ? 'Kokoro' : 'Piper'}…`;
       voiceHintUntil = Date.now() + 20000;
-      const data = await sendRpc('temple.speak', {
+      const data = await sendRpc('tts.test', {
         text,
+        engine,
         language: voice.language,
         voice: voice.id,
         speed,
-        broadcast: true
+        allowFallback: false
       });
       const result = data && data.result;
       if (result && result.ok && result.url) {
@@ -1013,9 +1242,9 @@
         player.src = result.url;
         player.play().catch(() => {});
         hint.textContent =
-          `Spoken with ${result.voice} (${result.language})` +
-          (result.cached ? ' · cached' : ` · ${result.synthSec}s`) +
-          ` · ${voice.path}`;
+          `${engine === 'kokoro' ? 'Kokoro' : 'Piper'} · ${result.voice} (${result.language})` +
+          (result.cached ? ' · cached' : result.latencyMs != null ? ` · ${result.latencyMs} ms` : ` · ${result.synthSec || 0}s`) +
+          (result.fallback ? ` · ⚠ ${result.fallbackError}` : '');
       } else {
         hint.textContent =
           'Voice failed: ' +
@@ -1028,17 +1257,16 @@
       const btn = document.getElementById('btnRefreshVoices');
       const hint = document.getElementById('ttsHint');
       btn.disabled = true;
-      hint.textContent = 'Scanning config/piper for new .onnx models…';
+      hint.textContent = `Refreshing ${activeTtsEngine() === 'kokoro' ? 'Kokoro' : 'Piper'}…`;
       voiceHintUntil = Date.now() + 6000;
-      const data = await sendRpc('tts.refreshVoices');
+      const data = await sendRpc('tts.refreshEngine', { engine: activeTtsEngine() });
       btn.disabled = false;
-      const catalog = data && data.result;
-      if (catalog && Array.isArray(catalog.en)) {
+      const status = data && data.result;
+      if (status && status.engines) {
         lastVoiceSignature = '';
-        applyVoiceCatalog(catalog);
-        hint.textContent =
-          `Piper voices refreshed · ${catalog.valid}/${catalog.total} playable` +
-          ` · English ${catalog.en.length} · Vietnamese ${catalog.vi.length}`;
+        lastKokoroSignature = '';
+        syncVoiceData(status);
+        hint.textContent = `${activeTtsEngine() === 'kokoro' ? 'Kokoro' : 'Piper'} status refreshed.`;
       } else {
         hint.textContent =
           'Voice refresh failed: ' + ((data && data.error && data.error.message) || 'unknown error');
@@ -1046,7 +1274,29 @@
       voiceHintUntil = Date.now() + 10000;
     };
 
+    document.getElementById('btnTestEngine').onclick = () => {
+      const select = document.getElementById('ttsVoice');
+      if (select && select.value) speakWithVoice(select.value);
+    };
+
+    document.getElementById('ttsEngine').onchange = async (event) => {
+      const engine = event.target.value === 'kokoro' ? 'kokoro' : 'piper';
+      document.getElementById('ttsLanguage').disabled = engine === 'kokoro';
+      if (engine === 'kokoro') document.getElementById('ttsLanguage').value = 'en';
+      const data = await sendRpc('temple.updateSettings', { ttsEngine: engine });
+      const state = data && data.result;
+      if (state && state.tts) {
+        lastVoiceSignature = '';
+        lastKokoroSignature = '';
+        syncVoiceData(state.tts);
+      }
+    };
+
     document.getElementById('ttsLanguage').onchange = async (e) => {
+      if (activeTtsEngine() === 'kokoro') {
+        e.target.value = 'en';
+        return;
+      }
       const language = e.target.value;
       const list = ttsVoices.filter((voice) => voice.language === language && voice.valid !== false);
       await sendRpc('temple.updateSettings', {
@@ -1058,7 +1308,9 @@
     };
     document.getElementById('ttsVoice').onchange = (e) => {
       renderVoiceDetail();
-      sendRpc('temple.updateSettings', { ttsVoice: e.target.value });
+      sendRpc('temple.updateSettings', activeTtsEngine() === 'kokoro'
+        ? { ttsKokoroVoice: e.target.value }
+        : { ttsVoice: e.target.value });
     };
 
     document.getElementById('btnTtsToggle').onclick = (e) => {
@@ -1083,6 +1335,43 @@
 
     document.getElementById('btnSpeak').onclick = () =>
       speakWithVoice(document.getElementById('ttsVoice').value);
+
+    document.getElementById('btnAuditionGenerate')?.addEventListener('click', () => {
+      const voice = document.getElementById('auditionVoice').value;
+      if (!voice) {
+        document.getElementById('auditionHint').textContent = 'Kokoro is not ready yet; waiting for a voice.';
+        return;
+      }
+      const text = document.getElementById('auditionText').value;
+      runAudition([{ engine: 'kokoro', voice, label: `Kokoro ${voice}` }]);
+    });
+
+    document.getElementById('btnAuditionSellers')?.addEventListener('click', () => {
+      const profiles = (voiceProfilesState && voiceProfilesState.profiles) || {};
+      const pick = (id, fallback) => {
+        const profile = profiles[id];
+        return profile && profile.resolvedEngine === 'kokoro' && profile.resolvedVoice
+          ? profile.resolvedVoice
+          : fallback;
+      };
+      runAudition([
+        { engine: 'kokoro', voice: pick('maleSeller', 'am_adam'), label: 'Male Seller' },
+        { engine: 'kokoro', voice: pick('femaleSeller', 'af_heart'), label: 'Female Seller' }
+      ]);
+    });
+
+    document.getElementById('btnAuditionEngines')?.addEventListener('click', () => {
+      const kokoroVoice = document.getElementById('auditionVoice').value;
+      const piperVoice = (ttsVoices.find((voice) => voice.language === 'en' && voice.valid !== false) || {}).id;
+      if (!kokoroVoice || !piperVoice) {
+        document.getElementById('auditionHint').textContent = 'Both engines need an available English voice before comparison.';
+        return;
+      }
+      runAudition([
+        { engine: 'piper', voice: piperVoice, label: 'Piper comparison' },
+        { engine: 'kokoro', voice: kokoroVoice, label: 'Kokoro comparison' }
+      ]);
+    });
 
     document.getElementById('btnSendRpc').onclick = async () => {
       const method = document.getElementById('rpcMethod').value.trim();
@@ -1318,7 +1607,14 @@
           </div>
           <div class="hint vp-persona">${escapeHtml(profile.personality || '')}</div>
           <div class="vp-setting">
-            <div class="label-line"><span>Piper voice</span><span class="vp-meta" data-vp-meta>—</span></div>
+            <div class="label-line"><span>Engine</span></div>
+            <select data-vp-engine>
+              <option value="piper">Piper · local ONNX</option>
+              <option value="kokoro">Kokoro · local neural</option>
+            </select>
+          </div>
+          <div class="vp-setting">
+            <div class="label-line"><span>Engine voice</span><span class="vp-meta" data-vp-meta>—</span></div>
             <select data-vp-voice></select>
           </div>
           <div class="vp-setting">
@@ -1340,7 +1636,7 @@
           <div class="vp-setting">
             <div class="vp-pitch"><span>Pitch</span><span>Not supported</span></div>
             <input type="range" data-vp-pitch min="-50" max="50" step="10" value="0" disabled />
-            <span class="vp-hint">Piper exposes no pitch parameter — disabled, never simulated.</span>
+            <span class="vp-hint">Neither local engine exposes pitch — disabled, never simulated.</span>
           </div>
           <div class="vp-test-row">
             <button class="btn gold" data-vp-test>🔊 Test Voice</button>
@@ -1365,9 +1661,11 @@
     function fillProfileVoiceSelect(card, profile) {
       const select = card.querySelector('[data-vp-voice]');
       if (!select) return;
-      const language = profile.language === 'vi' ? 'vi' : 'en';
-      const list = ttsVoices.filter((voice) => voice.language === language && voice.valid !== false);
-      const configured = profile.voice || '';
+      const engine = profile.engine === 'kokoro' ? 'kokoro' : 'piper';
+      const language = engine === 'kokoro' ? 'en' : profile.language === 'vi' ? 'vi' : 'en';
+      const source = engine === 'kokoro' ? kokoroVoices : ttsVoices;
+      const list = source.filter((voice) => voice.language === language && voice.valid !== false);
+      const configured = engine === 'kokoro' ? profile.kokoroVoice || '' : profile.voice || '';
       const options = [];
       if (profile.id === 'announcer') options.push('<option value="">Auto (mode below)</option>');
       if (profile.missing && configured) {
@@ -1378,7 +1676,9 @@
       for (const voice of list) {
         options.push(`<option value="${escapeHtml(voice.id)}">${escapeHtml(voiceOptionLabel(voice))}</option>`);
       }
-      if (!options.length) options.push('<option value="">No model in config/piper</option>');
+      if (!options.length) {
+        options.push(`<option value="">No ${engine === 'kokoro' ? 'Kokoro' : 'Piper'} voice available</option>`);
+      }
       select.innerHTML = options.join('');
       const auto = profile.id === 'announcer' && !configured;
       const wanted = auto ? '' : configured || profile.resolvedVoice || '';
@@ -1405,8 +1705,13 @@
       }
 
       if (!active) {
+        const engineSelect = card.querySelector('[data-vp-engine]');
+        if (engineSelect) engineSelect.value = profile.engine === 'kokoro' ? 'kokoro' : 'piper';
         const language = card.querySelector('[data-vp-language]');
-        if (language) language.value = profile.language === 'vi' ? 'vi' : 'en';
+        if (language) {
+          language.value = profile.engine === 'kokoro' ? 'en' : profile.language === 'vi' ? 'vi' : 'en';
+          language.disabled = profile.engine === 'kokoro';
+        }
         fillProfileVoiceSelect(card, profile);
         const mode = card.querySelector('[data-vp-mode]');
         if (mode) mode.value = profile.mode || 'alternate';
@@ -1424,13 +1729,20 @@
       if (meta) {
         const gender =
           profile.gender === 'female' ? '♀ Female' : profile.gender === 'male' ? '♂ Male' : '—';
-        meta.textContent = `${gender} · ${profile.resolvedVoiceName || profile.resolvedVoice || 'none'}`;
+        meta.textContent = `${profile.resolvedEngine === 'kokoro' ? 'Kokoro' : 'Piper'} · ${gender} · ${profile.resolvedVoiceName || profile.resolvedVoice || 'none'}`;
       }
       const hint = card.querySelector('[data-vp-hint]');
       if (hint && !hint.dataset.locked) {
-        hint.textContent = profile.missing
-          ? `⚠ ${profile.missingVoice} is missing — safe fallback: ${profile.resolvedVoice}`
-          : '';
+        if (profile.inheritedFrom) {
+          hint.textContent = `Following ${profile.inheritedFrom === 'femaleSeller' ? 'Female Seller' : 'Male Seller'} · ${profile.resolvedEngine === 'kokoro' ? 'Kokoro' : 'Piper'} / ${profile.resolvedVoice}`;
+        } else {
+          hint.textContent =
+            profile.resolvedEngine === 'kokoro' && !profile.available
+              ? '⚠ Kokoro is offline — this profile will use its saved Piper voice until the worker recovers.'
+              : profile.missing
+                ? `⚠ ${profile.missingVoice} is missing — safe fallback: ${profile.resolvedVoice}`
+                : '';
+        }
       }
       const test = card.querySelector('[data-vp-test]');
       if (test) test.disabled = profile.enabled === false;
@@ -1442,7 +1754,11 @@
       if (note && announcer) {
         note.textContent =
           `Announcer voice comes from profile C · ${VP_MODE_LABELS[announcer.mode] || announcer.mode}` +
-          (announcer.voice ? ` · exact voice ${announcer.voice}` : '') +
+          ((announcer.engine === 'kokoro' ? announcer.kokoroVoice : announcer.voice)
+            ? ` · exact ${announcer.engine === 'kokoro' ? 'Kokoro' : 'Piper'} voice ${
+                announcer.engine === 'kokoro' ? announcer.kokoroVoice : announcer.voice
+              }`
+            : '') +
           '. Speed, volume and language follow that seller.';
       }
       ['annVoiceMode', 'annVoice', 'annSpeed', 'annVol', 'annLanguage'].forEach((id) => {
@@ -1468,7 +1784,7 @@
       const note = document.getElementById('vpPitchNote');
       if (note && snapshot.capabilities) {
         note.textContent =
-          'Pitch: not supported. ' +
+          'Pitch: not supported by either local engine. ' +
           snapshot.capabilities.pitchReason +
           ' Speech volume is applied per item, so changing it never alters audio already playing.';
       }
@@ -1491,7 +1807,7 @@
         'Welcome to Sunny Side Sips!';
       if (hint) {
         hint.dataset.locked = '1';
-        hint.textContent = 'Synthesizing through Piper…';
+        hint.textContent = `Synthesizing through ${voiceProfilesState.profiles[id].resolvedEngine === 'kokoro' ? 'Kokoro' : 'Piper'}…`;
       }
       const data = await sendRpc('voice.test', { profile: id, text, broadcast: false });
       const result = data && data.result;
@@ -1503,8 +1819,9 @@
         }
         if (hint) {
           hint.textContent =
-            `${result.profileLabel || id} · ${result.voice} · ${Number(result.speed).toFixed(2)}× · ` +
+            `${result.profileLabel || id} · ${result.engine === 'kokoro' ? 'Kokoro' : 'Piper'} · ${result.voice} · ${Number(result.speed).toFixed(2)}× · ` +
             `${Math.round((result.volume ?? 0.9) * 100)}%` +
+            (result.fallback ? ` · ⚠ ${result.fallbackError} → Piper fallback` : '') +
             (result.missingVoice ? ` · ⚠ ${result.missingVoice} missing → fallback` : '');
         }
       } else if (hint) {
@@ -1541,11 +1858,19 @@
         } else if (event.target.matches('[data-vp-volume]')) {
           applyProfilePatch(id, { volume: Number(event.target.value) / 100 });
         } else if (event.target.matches('[data-vp-language]')) {
+          if ((voiceProfilesState.profiles[id] || {}).engine === 'kokoro') return;
           const language = event.target.value === 'vi' ? 'vi' : 'en';
           const first = ttsVoices.find((voice) => voice.language === language && voice.valid !== false);
           applyProfilePatch(id, { language, voice: first ? first.id : '' });
+        } else if (event.target.matches('[data-vp-engine]')) {
+          const engine = event.target.value === 'kokoro' ? 'kokoro' : 'piper';
+          event.target.blur();
+          applyProfilePatch(id, { engine, language: engine === 'kokoro' ? 'en' : undefined });
         } else if (event.target.matches('[data-vp-voice]')) {
-          applyProfilePatch(id, { voice: event.target.value });
+          const engine = (voiceProfilesState.profiles[id] || {}).engine;
+          applyProfilePatch(id, engine === 'kokoro'
+            ? { kokoroVoice: event.target.value }
+            : { voice: event.target.value });
         } else if (event.target.matches('[data-vp-mode]')) {
           applyProfilePatch(id, { mode: event.target.value });
         }
@@ -1566,12 +1891,17 @@
       if (refresh) {
         refresh.onclick = async () => {
           const status = document.getElementById('vpStatus');
-          if (status) status.textContent = 'Scanning config/piper for new models…';
-          await sendRpc('tts.refreshVoices');
+          if (status) status.textContent = 'Refreshing the selected TTS engine…';
+          const engineStatus = await sendRpc('tts.refreshEngine', { engine: activeTtsEngine() });
+          if (engineStatus && engineStatus.result) {
+            lastVoiceSignature = '';
+            lastKokoroSignature = '';
+            syncVoiceData(engineStatus.result);
+          }
           const data = await sendRpc('voice.getProfiles');
           const snapshot = data && data.result;
           if (snapshot && snapshot.profiles) renderVoiceProfiles(snapshot);
-          if (status) status.textContent = 'Voice catalog rescanned · profile selectors updated.';
+          if (status) status.textContent = 'Engine voices refreshed · profile selectors updated.';
         };
       }
       const reset = document.getElementById('btnVoiceProfilesReset');

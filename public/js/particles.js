@@ -11,8 +11,12 @@
       this.ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
       this.width = 1080;
       this.height = 1920;
-      canvas.width = this.width;
-      canvas.height = this.height;
+      // live.js may already have set a DPR-aware backing store. Do not reset it
+      // to 1080 x 1920 and throw away that high-DPI detail.
+      if (!canvas.width || canvas.width < this.width) {
+        canvas.width = this.width;
+        canvas.height = this.height;
+      }
 
       this.particles = [];
       this.time = 0;
@@ -217,6 +221,10 @@
 
     draw() {
       const ctx = this.ctx;
+      const renderScale = this.canvas.width / this.width;
+      if (Number.isFinite(renderScale) && renderScale > 0) {
+        ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+      }
       ctx.clearRect(0, 0, this.width, this.height);
       for (const p of this.particles) {
         const alpha = Math.max(0, Math.min(1, p.life));

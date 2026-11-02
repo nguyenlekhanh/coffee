@@ -2208,6 +2208,480 @@ class PiperTTSManager {
 }
 
 // ============================================================================
+// 3b. KOKORO TTS WORKER MANAGER (local Kokoro-82M, persistent Python worker)
+// ============================================================================
+const KOKORO_DEFAULT_VOICES = [
+  { id: 'af_heart', name: 'Heart', gender: 'female', language: 'en' },
+  { id: 'af_bella', name: 'Bella', gender: 'female', language: 'en' },
+  { id: 'af_nicole', name: 'Nicole', gender: 'female', language: 'en' },
+  { id: 'af_sarah', name: 'Sarah', gender: 'female', language: 'en' },
+  { id: 'af_sky', name: 'Sky', gender: 'female', language: 'en' },
+  { id: 'af_alloy', name: 'Alloy', gender: 'female', language: 'en' },
+  { id: 'af_aoede', name: 'Aoede', gender: 'female', language: 'en' },
+  { id: 'af_jessica', name: 'Jessica', gender: 'female', language: 'en' },
+  { id: 'af_kore', name: 'Kore', gender: 'female', language: 'en' },
+  { id: 'af_nova', name: 'Nova', gender: 'female', language: 'en' },
+  { id: 'af_river', name: 'River', gender: 'female', language: 'en' },
+  { id: 'am_adam', name: 'Adam', gender: 'male', language: 'en' },
+  { id: 'am_michael', name: 'Michael', gender: 'male', language: 'en' },
+  { id: 'am_echo', name: 'Echo', gender: 'male', language: 'en' },
+  { id: 'am_eric', name: 'Eric', gender: 'male', language: 'en' },
+  { id: 'am_fenrir', name: 'Fenrir', gender: 'male', language: 'en' },
+  { id: 'am_liam', name: 'Liam', gender: 'male', language: 'en' },
+  { id: 'am_onyx', name: 'Onyx', gender: 'male', language: 'en' },
+  { id: 'am_puck', name: 'Puck', gender: 'male', language: 'en' },
+  { id: 'am_santa', name: 'Santa', gender: 'male', language: 'en' }
+];
+
+class KokoroTTSManager {
+  constructor() {
+    this.proc = null;
+    this.ready = false;
+    this.status = 'starting';
+    this.error = null;
+    this.version = null;
+    this.device = 'cpu';
+    this.threads = null;
+    this.model = 'hexgrad/Kokoro-82M';
+    this.modelPath = '';
+    this.voices = KOKORO_DEFAULT_VOICES.map((voice) => ({ ...voice }));
+    this.pending = new Map();
+    this.inflight = new Map();
+    this.reqCounter = 0;
+    this.buffer = '';
+    this.startedAt = null;
+    this.readyAt = null;
+    this.loadMs = null;
+    this.lastGenerationMs = null;
+    this.lastDurationSec = null;
+    this.lastCacheHit = null;
+    this.lastError = null;
+    this.lastErrorAt = null;
+    this.generationCount = 0;
+    this.cacheHits = 0;
+    this.failures = 0;
+    this.restartCount = 0;
+    this.restartTimer = null;
+    this.startupTimer = null;
+    this.stopping = false;
+    this.startWorker('startup');
+  }
+
+  resolvePythonBin() {
+    const configured = String(process.env.KOKORO_PYTHON || '').trim();
+    if (configured && fs.existsSync(configured)) return configured;
+    const winVenv = path.join(__dirname, '.venv-kokoro', 'Scripts', 'python.exe');
+    if (fs.existsSync(winVenv)) return winVenv;
+    const venvPy = path.join(__dirname, '.venv-kokoro', 'bin', 'python');
+    if (fs.existsSync(venvPy)) return venvPy;
+    return process.platform === 'win32' ? 'python' : 'python3';
+  }
+
+  voicePayload(voice) {
+    return {
+      id: voice.id,
+      name: voice.name || voice.id,
+      friendlyName: `${voice.name || voice.id} · Kokoro US English`,
+      language: 'en',
+      gender: voice.gender || null,
+      description: 'Kokoro-82M local neural voice',
+      path: this.modelPath || 'data/kokoro-cache',
+      sampleRate: 24000,
+      valid: true,
+      problem: null,
+      warnings: this.ready ? [] : ['Kokoro worker is not ready; Piper fallback is active']
+    };
+  }
+
+  listVoices() {
+    return this.voices.map((voice) => ({ ...voice, language: 'en' }));
+  }
+
+  getCatalog() {
+    const voices = this.listVoices().map((voice) => this.voicePayload(voice));
+    return {
+      en: voices,
+      vi: [],
+      vn: [],
+      total: voices.length,
+      valid: this.ready ? voices.length : 0,
+      languages: ['en'],
+      modelsRoot: 'data/kokoro-cache/huggingface',
+      model: this.model,
+      modelPath: this.modelPath,
+      lastScanAt: this.readyAt,
+      skipped: []
+    };
+  }
+
+  startWorker(reason = 'startup') {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    if (this.startupTimer) {
+      clearTimeout(this.startupTimer);
+      this.startupTimer = null;
+    }
+    if (this.proc) {
+      try {
+        this.proc.kill();
+      } catch (_) {}
+      this.proc = null;
+    }
+    this.stopping = false;
+    this.ready = false;
+    this.status = 'loading';
+    this.error = null;
+    this.startedAt = Date.now();
+    this.readyAt = null;
+    this.buffer = '';
+    const pyBin = this.resolvePythonBin();
+    const scriptPath = path.join(__dirname, 'kokoro_worker.py');
+    if (!fs.existsSync(scriptPath)) {
+      this.status = 'offline';
+      this.error = 'kokoro_worker.py is missing';
+      return;
+    }
+    console.log(`[Kokoro TTS] Starting worker with ${pyBin} (${reason}) ...`);
+    try {
+      this.proc = spawn(pyBin, [scriptPath], {
+        cwd: __dirname,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: '1',
+          HF_HOME: path.join(DATA_DIR, 'kokoro-cache', 'huggingface'),
+          KOKORO_CACHE_DIR: TTS_CACHE_DIR
+        }
+      });
+    } catch (err) {
+      this.status = 'offline';
+      this.error = err.message;
+      this.scheduleRestart();
+      return;
+    }
+
+    this.proc.on('error', (err) => {
+      this.ready = false;
+      this.status = 'offline';
+      this.error = `Kokoro worker could not start: ${err.message}`;
+      this.lastError = this.error;
+      this.lastErrorAt = new Date().toISOString();
+      console.warn('[Kokoro TTS]', this.error);
+      this.scheduleRestart();
+    });
+    this.proc.stdout.on('data', (chunk) => {
+      this.buffer += chunk.toString('utf8');
+      const lines = this.buffer.split('\n');
+      this.buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.trim()) this.handleWorkerLine(line.trim());
+      }
+    });
+    this.proc.stderr.on('data', (chunk) => {
+      const msg = chunk.toString('utf8').trim();
+      if (msg) console.log(`[Kokoro TTS stderr] ${msg.slice(0, 900)}`);
+    });
+    this.proc.on('exit', (code, signal) => {
+      this.ready = false;
+      this.status = 'offline';
+      this.error = this.error || `Kokoro worker exited (${signal || code})`;
+      this.lastError = this.error;
+      this.lastErrorAt = new Date().toISOString();
+      this.failPending('Kokoro worker exited');
+      console.warn(`[Kokoro TTS] Worker exited (${signal || code}); Piper fallback remains active.`);
+      if (!this.stopping) this.scheduleRestart();
+      broadcastNotification('tts.status', ttsStatusSnapshot());
+    });
+
+    this.startupTimer = setTimeout(() => {
+      if (this.ready) return;
+      this.error = 'Kokoro model load timeout (240s)';
+      this.lastError = this.error;
+      this.lastErrorAt = new Date().toISOString();
+      console.warn('[Kokoro TTS]', this.error);
+      if (this.proc) {
+        try {
+          this.proc.kill();
+        } catch (_) {}
+      }
+    }, 240000);
+    if (this.startupTimer.unref) this.startupTimer.unref();
+  }
+
+  scheduleRestart() {
+    if (this.stopping || this.restartTimer) return;
+    const delays = [3000, 10000, 30000];
+    const delay = delays[Math.min(this.restartCount, delays.length - 1)];
+    this.restartCount += 1;
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null;
+      this.startWorker(`auto-recovery ${this.restartCount}`);
+    }, delay);
+    if (this.restartTimer.unref) this.restartTimer.unref();
+    console.log(`[Kokoro TTS] Retrying worker in ${Math.round(delay / 1000)}s`);
+  }
+
+  restart(reason = 'manual') {
+    this.restartCount = 0;
+    this.startWorker(reason);
+    broadcastNotification('tts.status', ttsStatusSnapshot());
+    return this.getStatus();
+  }
+
+  stop() {
+    this.stopping = true;
+    if (this.restartTimer) clearTimeout(this.restartTimer);
+    if (this.startupTimer) clearTimeout(this.startupTimer);
+    this.restartTimer = null;
+    this.startupTimer = null;
+    if (this.proc) {
+      try {
+        this.proc.stdin.write(JSON.stringify({ cmd: 'shutdown' }) + '\n');
+      } catch (_) {}
+      try {
+        this.proc.kill();
+      } catch (_) {}
+    }
+    this.proc = null;
+    this.ready = false;
+    this.status = 'stopped';
+  }
+
+  handleWorkerLine(line) {
+    let msg;
+    try {
+      msg = JSON.parse(line);
+    } catch (_) {
+      console.log('[Kokoro TTS stdout]', line.slice(0, 600));
+      return;
+    }
+    if (msg.type === 'loading') {
+      this.status = 'loading';
+      if (msg.model) this.model = msg.model;
+    } else if (msg.type === 'ready') {
+      this.ready = true;
+      this.status = 'ready';
+      this.error = null;
+      this.lastError = null;
+      this.version = msg.version || null;
+      this.device = msg.device || 'cpu';
+      this.threads = Number(msg.threads) || null;
+      this.model = msg.model || this.model;
+      this.modelPath = msg.modelPath || this.modelPath;
+      this.readyAt = Date.now();
+      this.loadMs = Number(msg.loadMs) || null;
+      this.restartCount = 0;
+      if (this.startupTimer) clearTimeout(this.startupTimer);
+      this.startupTimer = null;
+      if (Array.isArray(msg.voices) && msg.voices.length) {
+        this.voices = msg.voices.map((voice) => ({ ...voice, language: 'en' }));
+      }
+      console.log(
+        `[Kokoro TTS] Ready · ${this.device} · ${this.listVoices().length} voices · model ${this.model}`
+      );
+      this.warm(state.settings.ttsKokoroVoice, 'en');
+      broadcastNotification('tts.status', ttsStatusSnapshot());
+    } else if (msg.type === 'voices') {
+      if (Array.isArray(msg.voices) && msg.voices.length) {
+        this.voices = msg.voices.map((voice) => ({ ...voice, language: 'en' }));
+      }
+    } else if (msg.type === 'warning') {
+      console.warn('[Kokoro TTS]', msg.message);
+    } else if (msg.type === 'fatal') {
+      this.ready = false;
+      this.status = 'error';
+      this.error = msg.error || 'Kokoro model failed to load';
+      this.lastError = this.error;
+      this.lastErrorAt = new Date().toISOString();
+      console.error('[Kokoro TTS]', this.error);
+    } else if (msg.type === 'warm') {
+      if (!msg.ok) console.warn('[Kokoro TTS] Voice warm failed:', msg.error);
+    } else if (msg.type === 'result' && msg.id != null) {
+      const entry = this.pending.get(msg.id);
+      if (!entry) return;
+      clearTimeout(entry.timer);
+      this.pending.delete(msg.id);
+      if (msg.ok) {
+        this.generationCount += 1;
+        if (msg.cached) this.cacheHits += 1;
+        this.lastGenerationMs = Math.round((Date.now() - entry.startedAt));
+        this.lastDurationSec = Number(msg.durationSec) || null;
+        this.lastCacheHit = Boolean(msg.cached);
+        this.lastError = null;
+        entry.resolve({
+          ...msg,
+          latencyMs: this.lastGenerationMs,
+          synthSec: Number(msg.synthSec) || 0
+        });
+      } else {
+        this.failures += 1;
+        this.lastError = msg.error || 'Kokoro synthesis failed';
+        this.lastErrorAt = new Date().toISOString();
+        entry.resolve({ ...msg, latencyMs: Math.round(Date.now() - entry.startedAt) });
+      }
+    }
+  }
+
+  failPending(reason) {
+    for (const [, item] of this.pending) {
+      clearTimeout(item.timer);
+      item.resolve({ ok: false, engine: 'kokoro', error: reason });
+    }
+    this.pending.clear();
+  }
+
+  getStatus() {
+    return {
+      ready: this.ready,
+      status: this.status,
+      engine: 'Kokoro-82M (local neural)',
+      version: this.version,
+      model: this.model,
+      modelPath: this.modelPath,
+      device: this.device,
+      cuda: this.device === 'cuda',
+      threads: this.threads,
+      loadMs: this.loadMs,
+      lastGenerationMs: this.lastGenerationMs,
+      lastDurationSec: this.lastDurationSec,
+      lastCacheHit: this.lastCacheHit,
+      generationCount: this.generationCount,
+      cacheHits: this.cacheHits,
+      failures: this.failures,
+      restartCount: this.restartCount,
+      error: this.error,
+      lastError: this.lastError,
+      lastErrorAt: this.lastErrorAt,
+      startedAt: this.startedAt ? new Date(this.startedAt).toISOString() : null,
+      readyAt: this.readyAt ? new Date(this.readyAt).toISOString() : null,
+      voices: this.listVoices().map((voice) => this.voicePayload(voice)),
+      catalog: this.getCatalog(),
+      languages: ['en'],
+      sampleRate: 24000,
+      endpoint: 'persistent local Python worker over JSON lines'
+    };
+  }
+
+  warm(voice, _language) {
+    if (!this.proc || !this.ready) return;
+    try {
+      this.proc.stdin.write(JSON.stringify({ cmd: 'warm', voice: voice || 'af_heart' }) + '\n');
+    } catch (_) {}
+  }
+
+  synthesize(text, options = {}) {
+    const cleanText = String(text || '').trim().slice(0, clamp(state.settings.ttsMaxChars || 140, 40, 220));
+    if (!cleanText) return Promise.resolve({ ok: false, engine: 'kokoro', error: 'Empty text' });
+    const speed = clamp(Number(options.speed || 1), 0.5, 2);
+    let voice = String(options.voice || state.settings.ttsKokoroVoice || 'af_heart').trim();
+    if (!this.listVoices().some((candidate) => candidate.id === voice)) voice = 'af_heart';
+    const dedupKey = `${voice}::${speed.toFixed(2)}::${cleanText}`;
+    if (this.inflight.has(dedupKey)) return this.inflight.get(dedupKey);
+    if (!this.proc || !this.ready) {
+      return Promise.resolve({
+        ok: false,
+        engine: 'kokoro',
+        status: this.status,
+        error: this.error || `Kokoro worker status: ${this.status}`
+      });
+    }
+    const promise = new Promise((resolve) => {
+      const id = ++this.reqCounter;
+      const startedAt = Date.now();
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        this.failures += 1;
+        this.lastError = 'Kokoro generation timeout after 120000 ms';
+        this.lastErrorAt = new Date().toISOString();
+        resolve({ ok: false, engine: 'kokoro', error: this.lastError });
+      }, 120000);
+      this.pending.set(id, { resolve, timer, startedAt });
+      try {
+        this.proc.stdin.write(JSON.stringify({ id, text: cleanText, voice, speed }) + '\n');
+      } catch (err) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        resolve({ ok: false, engine: 'kokoro', error: err.message });
+      }
+    }).finally(() => this.inflight.delete(dedupKey));
+    this.inflight.set(dedupKey, promise);
+    return promise;
+  }
+}
+
+function ttsStatusSnapshot() {
+  const piper = piperTts.getStatus();
+  const kokoro = kokoroTts.getStatus();
+  const selected = state.settings.ttsEngine === 'kokoro' ? 'kokoro' : 'piper';
+  return {
+    ...piper,
+    engine: selected === 'kokoro' ? kokoro.engine : piper.engine,
+    selectedEngine: selected,
+    voice: state.settings.ttsVoice,
+    kokoroVoice: state.settings.ttsKokoroVoice,
+    activeReady: selected === 'kokoro' ? kokoro.ready : piper.ready,
+    piperEngine: piper.engine,
+    kokoroEngine: kokoro.engine,
+    piper,
+    kokoro,
+    engines: { piper, kokoro },
+    voices: piper.voices,
+    catalog: piper.catalog,
+    kokoroVoices: kokoro.voices,
+    supportedEngines: ['piper', 'kokoro'],
+    fallbackPolicy: 'Kokoro failures automatically use the profile Piper voice; saved Kokoro settings are never rewritten.'
+  };
+}
+
+function ttsEngineStatus(engine) {
+  return engine === 'kokoro' ? kokoroTts.getStatus() : piperTts.getStatus();
+}
+
+// All speech goes through this adapter so Kokoro can fail over without touching
+// the browser's priority queue, profile settings or saved state.
+async function synthesizeSpeech(text, options = {}) {
+  const requested = options.engine === 'kokoro' ? 'kokoro' : 'piper';
+  if (requested === 'piper') {
+    const result = await piperTts.synthesize(text, options);
+    return { ...result, engine: 'piper', requestedEngine: 'piper', fallback: false };
+  }
+  const result = await kokoroTts.synthesize(text, options);
+  if (result.ok) return { ...result, requestedEngine: 'kokoro', fallback: false };
+  const fallbackError = result.error || 'Kokoro is unavailable';
+  if (options.allowFallback === false) {
+    return { ...result, requestedEngine: 'kokoro', fallback: false, fallbackError };
+  }
+  const piperLanguage = options.language === 'vi' ? 'vi' : 'en';
+  let piperVoice = String(options.piperVoice || state.settings.ttsVoice || '').trim();
+  if (!piperTts.voicesFor(piperLanguage).some((voice) => voice.id === piperVoice)) {
+    piperVoice = piperTts.defaultVoice(piperLanguage) || piperVoice;
+  }
+  const fallback = await piperTts.synthesize(text, {
+    voice: piperVoice,
+    language: piperLanguage,
+    speed: options.speed
+  });
+  if (fallback.ok) {
+    return {
+      ...fallback,
+      engine: 'piper',
+      requestedEngine: 'kokoro',
+      fallback: true,
+      fallbackError,
+      requestedVoice: options.voice || state.settings.ttsKokoroVoice || 'af_heart'
+    };
+  }
+  return {
+    ...result,
+    requestedEngine: 'kokoro',
+    fallback: false,
+    fallbackError: `${fallbackError}; Piper fallback failed: ${fallback.error || 'unknown error'}`
+  };
+}
+
+// ============================================================================
 // 4. SHOP STATE
 // ============================================================================
 const DEFAULT_STATE = {
@@ -2227,8 +2701,10 @@ const DEFAULT_STATE = {
     paused: false,
     spawnRate: 1,
     ttsEnabled: true,
+    ttsEngine: 'piper',
     ttsLanguage: 'en',
     ttsVoice: 'en_US-amy-medium',
+    ttsKokoroVoice: 'af_heart',
     ttsSpeed: 1,
     ttsMaxChars: 120,
     bgMusicEnabled: true,
@@ -2367,10 +2843,14 @@ const VOICE_CAPABILITIES = {
   volume: true,
   pitch: false,
   pitchReason:
-    'The installed piper-tts engine exposes speaker_id, length_scale, noise_scale, noise_w_scale, normalize_audio and volume — there is no pitch parameter.',
+    'Piper and Kokoro expose speed and volume; neither local engine exposes a pitch parameter. Pitch is never simulated.',
   engineParameters: ['speaker_id', 'length_scale', 'noise_scale', 'noise_w_scale', 'normalize_audio', 'volume'],
   speedRange: [0.5, 2],
-  note: 'Volume is applied per speech item at playback, so a settings change never alters audio already queued or playing.'
+  note: 'Volume is applied per speech item at playback, so a settings change never alters audio already queued or playing.',
+  engines: {
+    piper: { speed: true, volume: true, pitch: false },
+    kokoro: { speed: true, volume: true, pitch: false }
+  }
 };
 
 function profileNumber(value, fallback) {
@@ -2389,10 +2869,10 @@ function defaultVoiceProfiles() {
     male ||
     null;
   return {
-    maleSeller: { enabled: true, voice: male ? male.id : '', language: 'en', speed: 1, volume: 0.9 },
-    femaleSeller: { enabled: true, voice: female ? female.id : '', language: 'en', speed: 1.05, volume: 0.9 },
-    announcer: { enabled: true, voice: '', language: 'en', speed: 1, volume: 0.9, mode: 'alternate' },
-    customer: { enabled: true, voice: customer ? customer.id : '', language: 'en', speed: 1, volume: 0.85 }
+    maleSeller: { enabled: true, engine: 'piper', voice: male ? male.id : '', kokoroVoice: 'am_adam', language: 'en', speed: 1, volume: 0.9 },
+    femaleSeller: { enabled: true, engine: 'piper', voice: female ? female.id : '', kokoroVoice: 'af_heart', language: 'en', speed: 1.05, volume: 0.9 },
+    announcer: { enabled: true, engine: 'piper', voice: '', kokoroVoice: '', language: 'en', speed: 1, volume: 0.9, mode: 'alternate' },
+    customer: { enabled: true, engine: 'piper', voice: customer ? customer.id : '', kokoroVoice: 'af_bella', language: 'en', speed: 1, volume: 0.85 }
   };
 }
 
@@ -2403,11 +2883,20 @@ function normalizeVoiceProfiles(raw) {
   for (const id of VOICE_PROFILE_IDS) {
     const base = defaults[id];
     const given = source[id] && typeof source[id] === 'object' ? source[id] : {};
+    const engine = given.engine === 'kokoro' ? 'kokoro' : given.engine === 'piper' ? 'piper' : base.engine;
     const entry = {
       id,
       enabled: given.enabled !== false,
+      engine,
       voice: typeof given.voice === 'string' ? given.voice.trim().slice(0, 80) : base.voice,
-      language: given.language === 'vi' ? 'vi' : given.language === 'en' ? 'en' : base.language,
+      kokoroVoice:
+        typeof given.kokoroVoice === 'string' ? given.kokoroVoice.trim().slice(0, 80) : base.kokoroVoice,
+      language:
+        engine === 'kokoro' || given.language === 'en'
+          ? 'en'
+          : given.language === 'vi'
+            ? 'vi'
+            : base.language,
       speed: Math.round(clamp(profileNumber(given.speed, base.speed), 0.5, 2) * 100) / 100,
       volume: Math.round(clamp(profileNumber(given.volume, base.volume), 0, 1) * 100) / 100
     };
@@ -2425,22 +2914,59 @@ function ensureVoiceProfiles() {
   return state.voiceProfiles;
 }
 
-// A configured voice that vanished from config/piper is reported, not overwritten.
+// A configured voice that vanished from its engine is reported, not overwritten.
+// Kokoro failures do not rewrite the profile: Piper is selected only for that
+// one request, with the profile's saved Piper voice as the fallback.
 function resolveProfileVoice(profile) {
-  const language = profile.language === 'vi' ? 'vi' : 'en';
-  const voices = piperTts.voicesFor(language);
-  const configured = String(profile.voice || '').trim();
-  const match = configured ? voices.find((voice) => voice.id === configured) : null;
-  const fallback = (voices[0] && voices[0].id) || piperTts.defaultVoice('en') || '';
-  const fallbackVoice = fallback ? piperTts.listVoices().find((voice) => voice.id === fallback) : null;
+  const engine = profile.engine === 'kokoro' ? 'kokoro' : 'piper';
+  const language = engine === 'kokoro' ? 'en' : profile.language === 'vi' ? 'vi' : 'en';
+  const piperLanguage = profile.language === 'vi' ? 'vi' : 'en';
+  const piperVoices = piperTts.voicesFor(piperLanguage);
+  const configuredPiper = String(profile.voice || '').trim();
+  const piperMatch = configuredPiper ? piperVoices.find((voice) => voice.id === configuredPiper) : null;
+  const piperFallback = (piperVoices[0] && piperVoices[0].id) || piperTts.defaultVoice(piperLanguage) || '';
+  if (engine === 'kokoro') {
+    const voices = kokoroTts.listVoices();
+    const configured = String(profile.kokoroVoice || '').trim();
+    const preferred =
+      profile.id === 'femaleSeller' ? 'af_heart' : profile.id === 'maleSeller' ? 'am_adam' : 'af_bella';
+    const match = configured ? voices.find((voice) => voice.id === configured) : null;
+    const fallbackVoice = voices.find((voice) => voice.id === preferred) || voices[0] || null;
+    return {
+      engine,
+      language,
+      voice: match ? match.id : fallbackVoice ? fallbackVoice.id : 'af_heart',
+      name: match ? match.name : fallbackVoice ? fallbackVoice.name : '',
+      gender: match ? match.gender || null : fallbackVoice ? fallbackVoice.gender || null : null,
+      missing: Boolean(configured) && !match,
+      configured,
+      available: kokoroTts.ready,
+      fallbackEngine: 'piper',
+      piperFallbackVoice: piperMatch ? piperMatch.id : piperFallback,
+      piperFallbackName: piperMatch
+        ? piperMatch.name
+        : (piperVoices.find((voice) => voice.id === piperFallback) || {}).name || ''
+    };
+  }
+  const fallbackVoice = piperVoices.find((voice) => voice.id === piperFallback) || null;
   return {
+    engine: 'piper',
     language,
-    voice: match ? match.id : fallback,
-    name: match ? match.name : fallbackVoice ? fallbackVoice.name : '',
-    gender: match ? match.gender || null : fallbackVoice ? fallbackVoice.gender || null : null,
-    missing: Boolean(configured) && !match,
-    configured
+    voice: piperMatch ? piperMatch.id : piperFallback,
+    name: piperMatch ? piperMatch.name : fallbackVoice ? fallbackVoice.name : '',
+    gender: piperMatch ? piperMatch.gender || null : fallbackVoice ? fallbackVoice.gender || null : null,
+    missing: Boolean(configuredPiper) && !piperMatch,
+    configured: configuredPiper,
+    available: piperTts.ready,
+    fallbackEngine: null,
+    piperFallbackVoice: piperMatch ? piperMatch.id : piperFallback,
+    piperFallbackName: fallbackVoice ? fallbackVoice.name : ''
   };
+}
+
+function profileHasExactVoice(profile) {
+  if (!profile) return false;
+  return profile.engine === 'kokoro' ? Boolean(profile.kokoroVoice) : Boolean(profile.voice);
 }
 
 let sellerTurn = 0;
@@ -2460,7 +2986,7 @@ function nextSellerProfile() {
   return choice;
 }
 
-function resolveAnnouncerSeller() {
+function resolveAnnouncerSeller(advance = true) {
   const profiles = ensureVoiceProfiles();
   const mode = profiles.announcer.mode || 'alternate';
   const sellers = enabledSellers(profiles);
@@ -2469,7 +2995,7 @@ function resolveAnnouncerSeller() {
   if (mode === 'femaleSeller') return profiles.femaleSeller.enabled !== false ? profiles.femaleSeller : sellers[0];
   if (mode === 'random') return sellers[Math.floor(Math.random() * sellers.length)];
   const choice = sellers[announcerTurn % sellers.length];
-  announcerTurn += 1;
+  if (advance) announcerTurn += 1;
   return choice;
 }
 
@@ -2479,7 +3005,7 @@ function activeProfileForRole(role) {
   if (role === 'announcer') {
     if (profiles.announcer.enabled === false) return null;
     // An exact announcer voice overrides the seller-selection modes.
-    if (profiles.announcer.voice) return profiles.announcer;
+    if (profileHasExactVoice(profiles.announcer)) return profiles.announcer;
     return resolveAnnouncerSeller() || null;
   }
   return nextSellerProfile();
@@ -2494,7 +3020,10 @@ function speechFor(role) {
     return {
       ttsProfile: role === 'customer' ? 'customer' : role === 'announcer' ? 'announcer' : 'maleSeller',
       ttsProfileEnabled: false,
-      ttsVoice: state.settings.ttsVoice,
+      ttsEngine: state.settings.ttsEngine,
+      ttsVoice:
+        state.settings.ttsEngine === 'kokoro' ? state.settings.ttsKokoroVoice : state.settings.ttsVoice,
+      ttsPiperFallbackVoice: state.settings.ttsVoice,
       ttsLanguage: state.settings.ttsLanguage,
       ttsSpeed: state.settings.ttsSpeed,
       ttsVolume: state.settings.ttsVolume
@@ -2504,11 +3033,14 @@ function speechFor(role) {
   return {
     ttsProfile: profile.id,
     ttsProfileEnabled: true,
+    ttsEngine: resolved.engine,
     ttsVoice: resolved.voice,
+    ttsPiperFallbackVoice: resolved.piperFallbackVoice,
     ttsLanguage: resolved.language,
     ttsSpeed: profile.speed,
     ttsVolume: profile.volume,
-    ttsVoiceMissing: resolved.missing
+    ttsVoiceMissing: resolved.missing,
+    ttsEngineAvailable: resolved.available
   };
 }
 
@@ -2522,7 +3054,10 @@ function speechForProfile(profileId) {
     return {
       ttsProfile: id,
       ttsProfileEnabled: false,
-      ttsVoice: state.settings.ttsVoice,
+      ttsEngine: state.settings.ttsEngine,
+      ttsVoice:
+        state.settings.ttsEngine === 'kokoro' ? state.settings.ttsKokoroVoice : state.settings.ttsVoice,
+      ttsPiperFallbackVoice: state.settings.ttsVoice,
       ttsLanguage: state.settings.ttsLanguage,
       ttsSpeed: state.settings.ttsSpeed,
       ttsVolume: state.settings.ttsVolume
@@ -2532,11 +3067,14 @@ function speechForProfile(profileId) {
   return {
     ttsProfile: id,
     ttsProfileEnabled: true,
+    ttsEngine: resolved.engine,
     ttsVoice: resolved.voice,
+    ttsPiperFallbackVoice: resolved.piperFallbackVoice,
     ttsLanguage: resolved.language,
     ttsSpeed: profile.speed,
     ttsVolume: profile.volume,
-    ttsVoiceMissing: resolved.missing
+    ttsVoiceMissing: resolved.missing,
+    ttsEngineAvailable: resolved.available
   };
 }
 
@@ -2545,7 +3083,11 @@ function voiceProfilesSnapshot() {
   const entries = {};
   for (const id of VOICE_PROFILE_IDS) {
     const profile = profiles[id];
-    const resolved = resolveProfileVoice(profile);
+    const effectiveProfile =
+      id === 'announcer' && !profileHasExactVoice(profile)
+        ? resolveAnnouncerSeller(false) || profile
+        : profile;
+    const resolved = resolveProfileVoice(effectiveProfile);
     const meta = VOICE_PROFILE_META[id];
     entries[id] = {
       ...profile,
@@ -2553,11 +3095,16 @@ function voiceProfilesSnapshot() {
       icon: meta.icon,
       role: meta.role,
       personality: meta.personality,
+      resolvedEngine: resolved.engine,
       resolvedVoice: resolved.voice,
       resolvedVoiceName: resolved.name,
+      available: resolved.available,
+      fallbackEngine: resolved.fallbackEngine,
+      piperFallbackVoice: resolved.piperFallbackVoice,
       gender: resolved.gender,
       missing: resolved.missing,
-      missingVoice: resolved.missing ? resolved.configured : ''
+      missingVoice: resolved.missing ? resolved.configured : '',
+      inheritedFrom: id === 'announcer' && !profileHasExactVoice(profile) ? effectiveProfile.id : ''
     };
   }
   return {
@@ -2567,6 +3114,24 @@ function voiceProfilesSnapshot() {
     announcerModes: [...ANNOUNCER_MODES],
     routes: { ...VOICE_ROUTES },
     capabilities: { ...VOICE_CAPABILITIES },
+    ttsEngine: state.settings.ttsEngine,
+    engines: {
+      piper: {
+        id: 'piper',
+        label: 'Piper',
+        ready: piperTts.ready,
+        status: piperTts.status,
+        error: piperTts.error,
+        languages: ['en', 'vi'],
+        voices: piperTts.listVoices().map((voice) => piperTts.voicePayload(voice)),
+        catalog: piperTts.getCatalog()
+      },
+      kokoro: {
+        ...kokoroTts.getStatus(),
+        id: 'kokoro',
+        label: 'Kokoro'
+      }
+    },
     sellerTurn,
     savedAt: state.voiceProfilesSavedAt || null
   };
@@ -3320,7 +3885,7 @@ function getPublicState() {
     recentEvents: state.recentEvents.slice(0, 12),
     settings: state.settings,
     tiktok: tiktokSnapshot(),
-    tts: piperTts.getStatus(),
+    tts: ttsStatusSnapshot(),
     voiceProfiles: voiceProfilesSnapshot(),
     voiceRoutes: { ...VOICE_ROUTES },
     conversations: conversationSnapshot(),
@@ -3888,8 +4453,14 @@ const Actions = {
     if (typeof params.ttsLanguage === 'string' && ['en', 'vi'].includes(params.ttsLanguage.toLowerCase())) {
       next.ttsLanguage = params.ttsLanguage.toLowerCase();
     }
+    if (typeof params.ttsEngine === 'string' && ['piper', 'kokoro'].includes(params.ttsEngine.toLowerCase())) {
+      next.ttsEngine = params.ttsEngine.toLowerCase();
+    }
     if (typeof params.ttsVoice === 'string' && params.ttsVoice.trim()) {
       next.ttsVoice = params.ttsVoice.trim().slice(0, 40);
+    }
+    if (typeof params.ttsKokoroVoice === 'string' && params.ttsKokoroVoice.trim()) {
+      next.ttsKokoroVoice = params.ttsKokoroVoice.trim().slice(0, 40);
     }
     if (typeof params.ttsSpeed === 'number') {
       next.ttsSpeed = Math.round(clamp(params.ttsSpeed, 0.5, 2) * 100) / 100;
@@ -3901,14 +4472,20 @@ const Actions = {
     if (!validVoiceIds.includes(next.ttsVoice)) {
       next.ttsVoice = piperTts.defaultVoice(next.ttsLanguage) || next.ttsVoice;
     }
+    const kokoroVoiceIds = kokoroTts.listVoices().map((voice) => voice.id);
+    if (!kokoroVoiceIds.includes(next.ttsKokoroVoice)) next.ttsKokoroVoice = 'af_heart';
     state.settings = next;
-    if (params.ttsLanguage || params.ttsVoice) {
+    if (params.ttsLanguage || params.ttsVoice || params.ttsEngine) {
       piperTts.warm(state.settings.ttsVoice, state.settings.ttsLanguage);
+    }
+    if (params.ttsEngine || params.ttsKokoroVoice) {
+      kokoroTts.warm(state.settings.ttsKokoroVoice, 'en');
     }
 
     if (typeof params.autoSim === 'boolean') configureAutoSim(params.autoSim);
 
     saveState();
+    broadcastNotification('tts.status', ttsStatusSnapshot());
     broadcastNotification('temple.state', getPublicState());
     return getPublicState();
   },
@@ -3986,9 +4563,14 @@ const Actions = {
     const next = { ...current };
 
     if (typeof patch.enabled === 'boolean') next.enabled = patch.enabled;
+    if (typeof patch.engine === 'string') {
+      next.engine = patch.engine.toLowerCase() === 'kokoro' ? 'kokoro' : 'piper';
+      if (next.engine === 'kokoro') next.language = 'en';
+    }
     if (typeof patch.voice === 'string') next.voice = patch.voice.trim().slice(0, 80);
+    if (typeof patch.kokoroVoice === 'string') next.kokoroVoice = patch.kokoroVoice.trim().slice(0, 80);
     if (typeof patch.language === 'string') {
-      next.language = patch.language.toLowerCase() === 'vi' ? 'vi' : 'en';
+      next.language = next.engine === 'kokoro' ? 'en' : patch.language.toLowerCase() === 'vi' ? 'vi' : 'en';
     }
     if (patch.speed !== undefined) {
       next.speed = Math.round(clamp(profileNumber(patch.speed, current.speed), 0.5, 2) * 100) / 100;
@@ -4036,30 +4618,38 @@ const Actions = {
     const resolved = resolveProfileVoice(profile);
     const text = String(params.text || '').trim().slice(0, 220);
     if (!text) return { ok: false, error: 'Empty preview text' };
-    const result = await piperTts.synthesize(text, {
+    const result = await synthesizeSpeech(text, {
+      engine: resolved.engine,
       voice: resolved.voice,
+      piperVoice: resolved.piperFallbackVoice,
       language: resolved.language,
-      speed: profile.speed
+      speed: profile.speed,
+      allowFallback: true
     });
     if (!result.ok) return { ...result, profile: id };
     const payload = {
       text,
+      engine: result.engine,
+      requestedEngine: resolved.engine,
       voice: result.voice,
       language: result.language,
       speed: result.speed,
       volume: profile.volume,
       profile: id,
-      url: result.url
+      url: result.url,
+      fallback: Boolean(result.fallback)
     };
     if (params.broadcast !== false) broadcastNotification('tts.play', payload);
     return {
       ...result,
       profile: id,
       resolvedProfile: profile.id,
+      resolvedEngine: resolved.engine,
       profileLabel: VOICE_PROFILE_META[id].label,
       speed: profile.speed,
       volume: profile.volume,
-      missingVoice: resolved.missing ? resolved.configured : ''
+      missingVoice: resolved.missing ? resolved.configured : '',
+      piperFallbackVoice: resolved.piperFallbackVoice
     };
   },
 
@@ -4783,6 +5373,8 @@ async function handleRpcCall(method, params = {}) {
       let speed = params.speed;
       let language = params.language;
       let voice = params.voice;
+      let engine = params.engine === 'kokoro' ? 'kokoro' : params.engine === 'piper' ? 'piper' : state.settings.ttsEngine;
+      let piperVoice = params.piperVoice;
       let volume;
       let profileId = '';
       if (params.profile && VOICE_PROFILE_IDS.includes(String(params.profile))) {
@@ -4792,20 +5384,33 @@ async function handleRpcCall(method, params = {}) {
           return { ok: false, error: `${VOICE_PROFILE_META[profileId].label} is disabled` };
         }
         voice = snapshot.resolvedVoice || voice;
+        engine = snapshot.resolvedEngine === 'kokoro' ? 'kokoro' : 'piper';
+        piperVoice = snapshot.piperFallbackVoice || piperVoice;
         language = snapshot.language;
         speed = snapshot.speed;
         volume = snapshot.volume;
       }
-      const res = await piperTts.synthesize(params.text, { voice, language, speed });
+      const res = await synthesizeSpeech(params.text, {
+        engine,
+        voice,
+        piperVoice,
+        language,
+        speed,
+        allowFallback: params.allowFallback !== false
+      });
       if (res.ok && params.broadcast !== false) {
         broadcastNotification('tts.play', {
           text: params.text,
+          engine: res.engine,
+          requestedEngine: res.requestedEngine,
           voice: res.voice,
           language: res.language,
           speed: res.speed,
           volume,
           profile: profileId,
-          url: res.url
+          url: res.url,
+          fallback: Boolean(res.fallback),
+          fallbackError: res.fallbackError || ''
         });
       }
       return res;
@@ -4917,7 +5522,34 @@ async function handleRpcCall(method, params = {}) {
 
     case 'temple.ttsStatus':
     case 'shop.ttsStatus':
-      return piperTts.getStatus();
+    case 'tts.status':
+    case 'tts.engines':
+      return ttsStatusSnapshot();
+
+    case 'tts.refreshEngine':
+    case 'tts.refreshStatus': {
+      const engine = params.engine === 'kokoro' ? 'kokoro' : params.engine === 'piper' ? 'piper' : state.settings.ttsEngine;
+      if (engine === 'kokoro') {
+        if (!kokoroTts.ready) kokoroTts.restart('admin-refresh');
+        else kokoroTts.warm(state.settings.ttsKokoroVoice, 'en');
+      } else {
+        piperTts.refreshVoices('admin-refresh');
+      }
+      return ttsStatusSnapshot();
+    }
+
+    case 'tts.test': {
+      const engine = params.engine === 'kokoro' ? 'kokoro' : 'piper';
+      const result = await synthesizeSpeech(params.text, {
+        engine,
+        voice: params.voice,
+        piperVoice: params.piperVoice,
+        language: params.language,
+        speed: params.speed,
+        allowFallback: params.allowFallback === true
+      });
+      return { ...result, requestedEngine: engine };
+    }
 
     case 'tts.refreshVoices':
     case 'temple.refreshVoices':
@@ -5011,7 +5643,13 @@ app.post('/rpc', async (req, res) => {
 
 app.get('/api/tts/voices', (req, res) => {
   const fresh = String(req.query?.refresh || '') === '1';
+  const engine = String(req.query?.engine || 'piper').toLowerCase();
+  if (engine === 'kokoro') return res.json(kokoroTts.getCatalog());
   res.json(fresh ? piperTts.refreshVoices('http') : piperTts.getCatalog());
+});
+
+app.get('/api/tts/engines', (_req, res) => {
+  res.json(ttsStatusSnapshot().engines);
 });
 
 app.all('/api/tts', async (req, res) => {
@@ -5020,10 +5658,13 @@ app.all('/api/tts', async (req, res) => {
   if (!text) {
     return res.status(400).json({ ok: false, error: 'Text is required' });
   }
-  const result = await piperTts.synthesize(text, {
+  const result = await synthesizeSpeech(text, {
+    engine: body.engine || req.query?.engine || state.settings.ttsEngine,
     voice: body.voice || req.query?.voice,
+    piperVoice: body.piperVoice || req.query?.piperVoice,
     language: body.language || req.query?.language,
-    speed: body.speed ?? req.query?.speed
+    speed: body.speed ?? req.query?.speed,
+    allowFallback: body.allowFallback !== false
   });
   res.json(result);
 });
@@ -5073,6 +5714,7 @@ wss.on('connection', (ws) => {
 });
 
 const piperTts = new PiperTTSManager();
+const kokoroTts = new KokoroTTSManager();
 if (!piperTts.listVoices().some((voice) => voice.id === state.settings.ttsVoice)) {
   state.settings.ttsVoice = piperTts.defaultVoice(state.settings.ttsLanguage) || state.settings.ttsVoice;
 }

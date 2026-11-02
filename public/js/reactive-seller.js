@@ -55,7 +55,9 @@
 
       if (this.audio && event.ttsText) {
         this.audio.enqueueTts(event.ttsText, {
+          engine: event.ttsEngine,
           voice: event.ttsVoice,
+          piperVoice: event.ttsPiperFallbackVoice,
           language: event.ttsLanguage,
           speed: event.ttsSpeed,
           volume: event.ttsVolume,

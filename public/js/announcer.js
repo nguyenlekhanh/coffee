@@ -279,7 +279,7 @@
         .filter((profile) => profile && profile.enabled !== false);
       if (!announcer || announcer.enabled === false) return sellers.length ? sellers[0] : null;
       // An exact announcer voice (profile C) overrides the seller-selection modes.
-      if (announcer.voice) return announcer;
+      if (announcer.engine === 'kokoro' ? announcer.kokoroVoice : announcer.voice) return announcer;
       if (!sellers.length) return announcer;
       const mode = announcer.mode || snapshot.announcerMode || 'alternate';
       if (mode === 'maleSeller') {
@@ -444,13 +444,16 @@
       if (!text) return false;
       const voice =
         item.voice ||
-        (profile && (profile.resolvedVoice || profile.voice)) ||
+        (profile && (profile.resolvedVoice || profile.voice || profile.kokoroVoice)) ||
         this.settings.voice ||
         pickVoice(speechLanguage, this.settings.voiceMode);
+      const engine = item.voice ? 'piper' : profile && profile.resolvedEngine === 'kokoro' ? 'kokoro' : 'piper';
       const ok = this.audio.enqueueTts(text, {
         priority: 2,
+        engine,
         language: speechLanguage,
         voice,
+        piperVoice: profile ? profile.piperFallbackVoice || profile.voice : this.settings.voice,
         speed: profile ? Number(profile.speed) || 1 : Number(this.settings.speed) || 1,
         volume: profile ? profile.volume : this.settings.volume,
         profile: profile ? profile.id : 'announcer',
@@ -508,7 +511,13 @@
         voiceProfile: (() => {
           const profiles = (this.voiceProfiles || voiceProfiles) || null;
           const announcer = profiles && profiles.profiles && profiles.profiles.announcer;
-          return announcer ? { mode: announcer.mode || profiles.announcerMode, voice: announcer.voice || '' } : null;
+          return announcer
+            ? {
+                mode: announcer.mode || profiles.announcerMode,
+                engine: announcer.engine || 'piper',
+                voice: (announcer.engine === 'kokoro' ? announcer.kokoroVoice : announcer.voice) || ''
+              }
+            : null;
         })(),
         speaking: Boolean(this.currentText),
         currentText: this.currentText,

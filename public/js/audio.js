@@ -13,8 +13,10 @@
       this.sfxEnabled = true;
       this.bgMusicEnabled = true;
       this.ttsEnabled = true;
+      this.ttsEngine = 'piper';
       this.ttsLanguage = 'en';
       this.ttsVoice = 'en_US-amy-medium';
+      this.ttsKokoroVoice = 'af_heart';
       this.ttsSpeed = 1;
 
       const savedMusic = parseFloat(localStorage.getItem('shop_music_vol'));
@@ -30,6 +32,7 @@
       this.ttsQueue = [];
       this.ttsPlaying = false;
       this.currentAudio = null;
+      this.currentSpeech = null;
       this.onTtsStateChange = null;
       this.onMusicStateChange = null;
 
@@ -186,7 +189,9 @@
         queued: this.ttsQueue.map((item) => ({
           text: item.text,
           priority: item.priority || 1,
+          engine: item.engine,
           voice: item.voice,
+          fallbackVoice: item.piperVoice,
           profile: item.profile,
           volume: item.volume
         }))
@@ -305,6 +310,23 @@
 
       // Priority 0 = gifts/VIP, 1 = viewer replies, 2 = automatic announcements.
       const priority = Number.isFinite(Number(options.priority)) ? Number(options.priority) : 1;
+      const engine = options.engine === 'kokoro' ? 'kokoro' : options.engine === 'piper' ? 'piper' : this.ttsEngine;
+      const voice =
+        options.voice ||
+        (engine === 'kokoro' ? this.ttsKokoroVoice : this.ttsVoice) ||
+        'en_US-amy-medium';
+
+      // Never enqueue the same line twice while it is waiting or already
+      // playing. This is a queue guard only; the scheduler still owns pacing.
+      const isDuplicate = () =>
+        (this.currentSpeech &&
+          this.currentSpeech.text === clean &&
+          this.currentSpeech.voice === voice &&
+          this.currentSpeech.engine === engine) ||
+        this.ttsQueue.some(
+          (queued) => queued.text === clean && queued.voice === voice && queued.engine === engine
+        );
+      if (isDuplicate()) return false;
 
       // Automatic chatter never queues behind speech and never floods the queue.
       if (priority >= 2) {
@@ -325,9 +347,11 @@
       const item = {
         id: `tts_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         priority,
+        engine,
         text: clean,
         language: options.language || this.ttsLanguage || 'en',
-        voice: options.voice || this.ttsVoice || 'en_US-amy-medium',
+        voice,
+        piperVoice: options.piperVoice || this.ttsVoice || 'en_US-amy-medium',
         speed: Number(options.speed || this.ttsSpeed || 1),
         volume: Math.max(0, Math.min(1, Number(options.volume ?? this.ttsVolume ?? 0.9))),
         profile: options.profile || '',
@@ -338,9 +362,11 @@
       };
       if (!item.url) {
         item.fetchPromise = this.fetchPiperAudio(item.text, {
+          engine: item.engine,
           language: item.language,
           voice: item.voice,
-          speed: item.speed
+          speed: item.speed,
+          piperVoice: item.piperVoice
         });
       }
 
@@ -359,9 +385,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text,
+            engine: options.engine || this.ttsEngine,
             language: options.language || this.ttsLanguage,
             voice: options.voice || this.ttsVoice,
-            speed: options.speed || this.ttsSpeed
+            speed: options.speed || this.ttsSpeed,
+            piperVoice: options.piperVoice || this.ttsVoice
           })
         });
         const data = await res.json();
@@ -377,16 +405,28 @@
       this.ttsPlaying = true;
       if (this.music) this.music.setDuck(true);
       const item = this.ttsQueue.shift();
+      this.currentSpeech = item;
 
       try {
         let audioUrl = item.url;
         if (!audioUrl && item.fetchPromise) {
           const res = await item.fetchPromise;
-          if (res && res.ok && res.url) audioUrl = res.url;
+          if (res && res.ok && res.url) {
+            audioUrl = res.url;
+            if (res.engine === 'piper' || res.engine === 'kokoro') item.engine = res.engine;
+            if (res.voice) item.voice = res.voice;
+            if (res.fallback) item.fallback = true;
+          }
         }
         if (audioUrl) {
           if (this.onTtsStateChange) {
-            this.onTtsStateChange({ speaking: true, text: item.text, voice: item.voice, profile: item.profile });
+            this.onTtsStateChange({
+              speaking: true,
+              text: item.text,
+              engine: item.engine,
+              voice: item.voice,
+              profile: item.profile
+            });
           }
           if (item.onStart) item.onStart();
           await this.playAudioUrl(audioUrl, item.volume);
@@ -401,6 +441,7 @@
         if (item.onEnd) item.onEnd();
       } finally {
         this.ttsPlaying = false;
+        this.currentSpeech = null;
         if (this.music) this.music.setDuck(false);
         if (this.onTtsStateChange) this.onTtsStateChange({ speaking: false, text: '' });
         if (this.ttsQueue.length > 0) setTimeout(() => this.processTtsQueue(), 220);

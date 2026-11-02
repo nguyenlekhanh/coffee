@@ -152,6 +152,43 @@
     return out + '…';
   }
 
+  /** Wrap a canvas label without exceeding the bubble/tag width. */
+  function wrapCanvasText(ctx, text, maxWidth, maxLines = 3) {
+    const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    if (!words.length) return [''];
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        line = candidate;
+        continue;
+      }
+      if (line) lines.push(line);
+      if (ctx.measureText(word).width <= maxWidth) {
+        line = word;
+        continue;
+      }
+      // Split an oversized unbroken token rather than letting it leave the box.
+      line = '';
+      for (const char of word) {
+        if (line && ctx.measureText(line + char).width > maxWidth) {
+          lines.push(line);
+          line = char;
+        } else {
+          line += char;
+        }
+      }
+    }
+    if (line) lines.push(line);
+    if (lines.length > maxLines) {
+      const rest = lines.slice(maxLines - 1).join(' ');
+      lines.length = maxLines - 1;
+      lines.push(ellipsize(ctx, rest, maxWidth));
+    }
+    return lines;
+  }
+
   function loadImage(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -265,6 +302,10 @@
     constructor(canvas) {
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
+      const initialScale = canvas.width / W;
+      if (Number.isFinite(initialScale) && initialScale > 0) {
+        this.ctx.setTransform(initialScale, 0, 0, initialScale, 0, 0);
+      }
       this.sprites = { customers: [], drinks: [], sellers: {} };
       this.customers = [];
       this.queue = [];
@@ -1405,6 +1446,12 @@
     render() {
       if (!this.ready) return;
       const ctx = this.ctx;
+      // The backing store can be denser than 1080 x 1920 on high-DPI displays.
+      // Keep every scene coordinate in the original 1080 x 1920 space.
+      const renderScale = this.canvas.width / W;
+      if (Number.isFinite(renderScale) && renderScale > 0) {
+        ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+      }
       ctx.clearRect(0, 0, W, H);
 
       this.drawGround(ctx);
@@ -1489,18 +1536,18 @@
       ctx.save();
       ctx.translate(646, 1222);
       ctx.rotate(-0.03);
-      ctx.font = '800 20px "Nunito", sans-serif';
+      ctx.font = '800 26px "Nunito", sans-serif';
       ctx.textAlign = 'center';
       const label = 'ORDER HERE';
       const w = ctx.measureText(label).width + 34;
       ctx.fillStyle = 'rgba(255, 247, 228, 0.78)';
-      roundedRect(ctx, -w / 2, -18, w, 36, 10);
+      roundedRect(ctx, -w / 2, -24, w, 46, 12);
       ctx.fill();
       ctx.strokeStyle = 'rgba(59, 42, 32, 0.5)';
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.fillStyle = 'rgba(59, 42, 32, 0.72)';
-      ctx.fillText(label, 0, 8);
+      ctx.fillText(label, 0, 10);
       ctx.restore();
     }
 
@@ -1595,18 +1642,18 @@
       ctx.restore();
 
       // counter sign plaque
-      ctx.font = '800 20px "Baloo 2", "Nunito", sans-serif';
+      ctx.font = '800 26px "Baloo 2", "Nunito", sans-serif';
       ctx.textAlign = 'center';
       const plaqueLabel = 'FRESH SQUEEZED DAILY';
-      const plaqueW = ctx.measureText(plaqueLabel).width + 30;
-      roundedRect(ctx, x + w / 2 - plaqueW / 2, frontY + frontH / 2 - 17, plaqueW, 34, 10);
+      const plaqueW = ctx.measureText(plaqueLabel).width + 38;
+      roundedRect(ctx, x + w / 2 - plaqueW / 2, frontY + frontH / 2 - 22, plaqueW, 44, 12);
       ctx.fillStyle = COLORS.cream;
       ctx.fill();
       ctx.strokeStyle = COLORS.ink;
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.fillStyle = COLORS.coralDark;
-      ctx.fillText(plaqueLabel, x + w / 2, frontY + frontH / 2 + 7);
+      ctx.fillText(plaqueLabel, x + w / 2, frontY + frontH / 2 + 9);
 
       // top slab
       roundedRect(ctx, x - 16, y - 14, w + 32, 44, 16);
@@ -1777,7 +1824,10 @@
       if (showName) {
         this.drawNameTag(ctx, customer, feetY - height - (vipLevel >= 2 ? 38 : customer.vip ? 34 : 12), scale);
       }
-      if (customer.bubble) this.drawBubble(ctx, customer.x, feetY - height - 6, customer.bubble, scale);
+      if (customer.bubble) {
+        const bubbleLift = showName ? 86 : 8;
+        this.drawBubble(ctx, customer.x, feetY - height - bubbleLift, customer.bubble, scale);
+      }
     }
 
     drawCrown(ctx, x, y, scale, style = 'gold') {
@@ -1809,26 +1859,26 @@
     }
 
     drawVipBadge(ctx, x, y, scale) {
-      const r = 15 * scale;
+      const r = 23 * scale;
       ctx.save();
       ctx.beginPath();
-      ctx.arc(x + 28 * scale, y, r, 0, Math.PI * 2);
+      ctx.arc(x + 32 * scale, y, r, 0, Math.PI * 2);
       ctx.fillStyle = '#ffd76a';
       ctx.fill();
       ctx.strokeStyle = COLORS.ink;
       ctx.lineWidth = 2.5;
       ctx.stroke();
-      ctx.font = `800 ${Math.round(11 * clamp(scale, 0.85, 1.1))}px "Nunito", sans-serif`;
+      ctx.font = `800 ${Math.round(26 * clamp(scale, 0.85, 1.1))}px "Nunito", sans-serif`;
       ctx.fillStyle = '#6b4512';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('VIP', x + 28 * scale, y + 0.5);
+      ctx.fillText('VIP', x + 32 * scale, y + 0.5);
       ctx.restore();
     }
 
     drawNameTag(ctx, customer, y, scale) {
       ctx.save();
-      ctx.font = `800 ${Math.round(19 * clamp(scale, 0.58, 1.06))}px "Nunito", sans-serif`;
+      ctx.font = `800 ${Math.round(28 * clamp(scale, 0.72, 1.06))}px "Nunito", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const pending = customer.orders ? customer.orders.length : 0;
@@ -1837,11 +1887,14 @@
         : customer.gift
           ? `${customer.name} · ${customer.gift.name}`
           : customer.name;
-      const text = ellipsize(ctx, label, customer.vipLevel ? 210 : 168);
-      const tagH = 32;
-      const tagW = Math.max(64, ctx.measureText(text).width + 26);
+      const maxWidth = customer.vipLevel ? 330 : 300;
+      const lines = wrapCanvasText(ctx, label, maxWidth, 2);
+      const lineHeight = 32;
+      const tagH = lines.length * lineHeight + 14;
+      const textW = Math.max(...lines.map((line) => ctx.measureText(line).width));
+      const tagW = Math.max(96, Math.min(360, textW + 34));
       const tagX = clamp(customer.x - tagW / 2, 10, W - tagW - 10);
-      roundedRect(ctx, tagX, y - tagH, tagW, tagH, 12);
+      roundedRect(ctx, tagX, y - tagH, tagW, tagH, 14);
       const level = customer.vipLevel || 0;
       if (level >= 3) {
         ctx.shadowColor = '#69d2ff';
@@ -1862,7 +1915,10 @@
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.fillStyle = COLORS.ink;
-      ctx.fillText(text, tagX + tagW / 2, y - tagH / 2 + 1);
+      const firstLineY = y - tagH + 7 + lineHeight / 2;
+      lines.forEach((line, index) => {
+        ctx.fillText(line, tagX + tagW / 2, firstLineY + index * lineHeight);
+      });
       ctx.restore();
     }
 
@@ -1871,15 +1927,16 @@
       const alpha = clamp(bubble.timer / 350, 0, 1);
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.font = '800 21px "Nunito", sans-serif';
-      const text = ellipsize(ctx, String(bubble.text || '').slice(0, 120), 330);
-      const textW = ctx.measureText(text).width;
+      ctx.font = '800 32px "Nunito", sans-serif';
       const hasDrink = Boolean(bubble.drink && bubble.drink.sprite);
-      const iconW = hasDrink ? 42 : 0;
-      const boxW = Math.min(W - 40, textW + iconW + 34);
-      const boxH = 54;
+      const iconW = hasDrink ? 54 : 0;
+      const lines = wrapCanvasText(ctx, String(bubble.text || '').slice(0, 180), 440, 3);
+      const textW = Math.max(...lines.map((line) => ctx.measureText(line).width));
+      const boxW = Math.min(500, Math.max(160, textW + iconW + 44));
+      const lineHeight = 40;
+      const boxH = Math.max(72, lines.length * lineHeight + 28);
       const boxX = clamp(x - boxW / 2, 12, W - boxW - 12);
-      const boxY = y - boxH;
+      const boxY = Math.max(10, y - boxH);
 
       // tail first so the body covers its top edge
       ctx.beginPath();
@@ -1903,15 +1960,18 @@
 
       if (hasDrink) {
         const s = bubble.drink.sprite;
-        const cupH = 38;
+        const cupH = 50;
         const cupW = cupH * (s.w / s.h);
-        ctx.drawImage(s.canvas, boxX + 12, boxY + boxH / 2 - cupH / 2, cupW, cupH);
+        ctx.drawImage(s.canvas, boxX + 18, boxY + boxH / 2 - cupH / 2, cupW, cupH);
       }
 
       ctx.fillStyle = COLORS.ink;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, boxX + 12 + iconW, boxY + boxH / 2 + 1);
+      const firstLineY = boxY + (boxH - lines.length * lineHeight) / 2 + lineHeight / 2 + 1;
+      lines.forEach((line, index) => {
+        ctx.fillText(line, boxX + 18 + iconW, firstLineY + index * lineHeight);
+      });
       ctx.restore();
     }
 
@@ -1926,7 +1986,7 @@
         }
         ctx.save();
         ctx.globalAlpha = clamp(pop.life, 0, 1);
-        ctx.font = '800 28px "Baloo 2", "Nunito", sans-serif';
+        ctx.font = '800 34px "Baloo 2", "Nunito", sans-serif';
         ctx.textAlign = 'center';
         ctx.lineWidth = 6;
         ctx.strokeStyle = '#fffdf6';

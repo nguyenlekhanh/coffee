@@ -29,6 +29,7 @@ html,
 body {
   width: 100%;
   height: 100%;
+  min-height: 100%;
   overflow: hidden;
   background: #2c2a3a;
   font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -36,11 +37,15 @@ body {
 }
 
 .app-workspace {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100vw;
+  /* Match the document width, not 100vw: fractional device viewports can
+     make 100vw slightly wider and push a perfectly 9:16 stage off-center. */
+  width: 100%;
   height: 100vh;
+  height: 100dvh;
   gap: 22px;
   padding: 12px;
   background:
@@ -127,6 +132,7 @@ body.obs-mode .stage-wrapper {
   width: 1080px;
   height: 1920px;
   pointer-events: none;
+  image-rendering: auto;
 }
 
 #gameCanvas {
@@ -142,14 +148,14 @@ body.obs-mode .stage-wrapper {
    ========================================================================== */
 .top-bar {
   position: absolute;
-  top: 22px;
+  top: 20px;
   left: 26px;
   right: 26px;
   z-index: 20;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   pointer-events: none;
 }
 
@@ -157,21 +163,37 @@ body.obs-mode .stage-wrapper {
 .mini-stat-pill {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 18px;
+  gap: 10px;
   border-radius: 999px;
   background: rgba(255, 247, 228, 0.96);
   border: 3px solid var(--ink);
   box-shadow: var(--card-shadow);
-  font-size: 19px;
   font-weight: 800;
-  letter-spacing: 0.4px;
   color: var(--ink);
 }
 
+.live-pill {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 380px;
+  padding: 10px 16px;
+  font-size: 22px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#liveStatusText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .live-dot {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
   border-radius: 50%;
   background: #ff4b3a;
   box-shadow: 0 0 0 3px rgba(255, 75, 58, 0.25);
@@ -182,13 +204,37 @@ body.obs-mode .stage-wrapper {
 }
 
 .stat-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 1 1 630px;
+  min-width: 0;
+  max-width: 630px;
   gap: 10px;
 }
 
+.mini-stat-pill {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  padding: 7px 10px 9px;
+  overflow: hidden;
+}
+
 .mini-stat-pill strong {
-  font-size: 21px;
+  font-size: 52px;
+  line-height: 0.95;
+  letter-spacing: -1.5px;
   color: var(--coral-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-stat-pill .stat-label {
+  margin-top: 2px;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.8px;
+  color: var(--ink-soft);
 }
 
 /* ==========================================================================
@@ -196,12 +242,12 @@ body.obs-mode .stage-wrapper {
    ========================================================================== */
 .shop-sign {
   position: absolute;
-  top: 108px;
+  top: 124px;
   left: 50%;
   transform: translateX(-50%) rotate(-1.4deg);
   z-index: 18;
-  width: 640px;
-  padding: 14px 22px 16px;
+  width: 780px;
+  padding: 14px 24px 17px;
   text-align: center;
   border-radius: 22px;
   background: linear-gradient(180deg, #fff9e9 0%, #ffe7b8 100%);
@@ -212,7 +258,7 @@ body.obs-mode .stage-wrapper {
 
 .sign-top {
   font-family: 'Baloo 2', 'Nunito', sans-serif;
-  font-size: 54px;
+  font-size: 62px;
   line-height: 1;
   font-weight: 800;
   letter-spacing: 1px;
@@ -222,21 +268,21 @@ body.obs-mode .stage-wrapper {
 
 .sign-sub {
   margin-top: 4px;
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 800;
-  letter-spacing: 5px;
+  letter-spacing: 3px;
   color: var(--ink-soft);
 }
 
 .sign-chip {
   display: inline-block;
   margin-top: 9px;
-  padding: 4px 16px;
+  padding: 5px 18px;
   border-radius: 999px;
   background: var(--mint);
   border: 3px solid var(--ink);
   color: #fff;
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: 1.6px;
 }
@@ -252,15 +298,15 @@ body.obs-mode .stage-wrapper {
    ========================================================================== */
 .queue-chip {
   position: absolute;
-  top: 300px;
+  top: 338px;
   right: 30px;
   z-index: 18;
-  padding: 8px 16px;
+  padding: 10px 18px;
   border-radius: 16px;
   background: rgba(255, 247, 228, 0.95);
   border: 3px solid var(--ink);
   box-shadow: var(--card-shadow);
-  font-size: 18px;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: 1px;
   pointer-events: none;
@@ -300,7 +346,7 @@ body.obs-mode .stage-wrapper {
   border-radius: 999px;
   background: var(--coral);
   color: #fff;
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: 2px;
 }
@@ -318,7 +364,7 @@ body.obs-mode .stage-wrapper {
 
 .mystery-title {
   font-family: 'Baloo 2', 'Nunito', sans-serif;
-  font-size: 32px;
+  font-size: 42px;
   font-weight: 800;
   color: var(--coral-dark);
   line-height: 1.1;
@@ -326,7 +372,7 @@ body.obs-mode .stage-wrapper {
 
 .mystery-poem {
   margin-top: 8px;
-  font-size: 17px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--ink-soft);
   line-height: 1.4;
@@ -337,7 +383,7 @@ body.obs-mode .stage-wrapper {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 2px dashed rgba(59, 42, 32, 0.25);
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--ink);
   line-height: 1.4;
@@ -366,14 +412,14 @@ body.obs-mode .stage-wrapper {
 }
 .party-title {
   font-family: 'Baloo 2', 'Nunito', sans-serif;
-  font-size: 40px;
+  font-size: 52px;
   font-weight: 800;
   color: #fff8d6;
   letter-spacing: 1px;
 }
 .party-sub {
   margin-top: 4px;
-  font-size: 21px;
+  font-size: 30px;
   font-weight: 800;
   color: #fff;
 }
@@ -407,7 +453,7 @@ body.obs-mode .stage-wrapper {
   box-shadow: 0 12px 0 rgba(0, 0, 0, 0.35);
 }
 .paused-sub {
-  font-size: 22px;
+  font-size: 30px;
   font-weight: 800;
   color: #fff;
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
@@ -418,20 +464,21 @@ body.obs-mode .stage-wrapper {
    ========================================================================== */
 .bottom-hud {
   position: absolute;
-  bottom: 22px;
-  left: 26px;
-  right: 26px;
-  height: 196px;
+  bottom: 18px;
+  left: 20px;
+  right: 20px;
+  height: 280px;
   z-index: 20;
   display: grid;
-  grid-template-columns: 1.72fr 1fr;
-  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .hud-cards {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 8px;
   height: 100%;
 }
 
@@ -440,7 +487,8 @@ body.obs-mode .stage-wrapper {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 12px 12px 14px;
+  min-width: 0;
+  padding: 6px 2px 8px;
   border-radius: 18px;
   border: 4px solid var(--ink);
   background: var(--cream);
@@ -472,31 +520,38 @@ body.obs-mode .stage-wrapper {
 
 .hud-card-tip {
   align-self: flex-start;
-  padding: 3px 9px;
+  padding: 3px 8px;
   border-radius: 8px;
   background: rgba(59, 42, 32, 0.82);
   color: #fff6dc;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 1.1px;
 }
 
 .hud-card-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
 }
 
 .hud-emoji {
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1;
 }
 
 .hud-label {
   font-family: 'Baloo 2', 'Nunito', sans-serif;
-  font-size: 25px;
+  font-size: 30px;
   font-weight: 800;
   color: var(--ink);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hud-leaderboard {
@@ -504,7 +559,7 @@ body.obs-mode .stage-wrapper {
   border: 4px solid var(--ink);
   border-radius: 18px;
   box-shadow: 0 7px 0 rgba(59, 42, 32, 0.32);
-  padding: 10px 14px 12px;
+  padding: 8px 12px 9px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -512,20 +567,20 @@ body.obs-mode .stage-wrapper {
 
 .lb-header {
   text-align: center;
-  padding-bottom: 6px;
-  margin-bottom: 6px;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
   border-bottom: 2px dashed rgba(59, 42, 32, 0.25);
   font-family: 'Baloo 2', 'Nunito', sans-serif;
-  font-size: 19px;
+  font-size: 24px;
   font-weight: 800;
-  letter-spacing: 1.6px;
+  letter-spacing: 1.2px;
   color: var(--coral-dark);
 }
 
 .lb-list {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   flex: 1;
   overflow: hidden;
 }
@@ -533,8 +588,8 @@ body.obs-mode .stage-wrapper {
 .leader-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 15px;
+  gap: 6px;
+  font-size: 30px;
   font-weight: 800;
   color: var(--ink);
 }
@@ -564,18 +619,18 @@ body.obs-mode .stage-wrapper {
 .leader-item.leader-top {
   align-items: center;
   gap: 6px;
-  padding: 3px 2px;
+  padding: 4px 2px;
   border-radius: 10px;
 }
 .leader-medal {
   flex: 0 0 auto;
-  font-size: 19px;
+  font-size: 30px;
   line-height: 1;
 }
 .leader-avatar {
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 2px solid var(--ink);
   object-fit: cover;
@@ -585,7 +640,7 @@ body.obs-mode .stage-wrapper {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 800;
   color: #6b4512;
 }
@@ -597,24 +652,27 @@ body.obs-mode .stage-wrapper {
   line-height: 1.1;
 }
 .leader-main .leader-name {
-  font-size: 14px;
+  font-size: 30px;
+  line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .leader-vip {
-  font-size: 9.5px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: 0.4px;
+  line-height: 1;
+  letter-spacing: 0.2px;
   color: var(--ink-soft);
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .leader-vip.vip-1 { color: #a07a12; }
 .leader-vip.vip-2 { color: #b47b00; }
 .leader-vip.vip-3 { color: #0e6b93; }
 .leader-coins {
   flex: 0 0 auto;
-  font-size: 13.5px;
+  font-size: 32px;
   font-weight: 800;
   color: var(--mint);
 }
@@ -630,24 +688,25 @@ body.obs-mode .stage-wrapper {
 /* --- supporter notifications ------------------------------------------- */
 .notice-stack {
   position: absolute;
-  top: 112px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 76%;
+  top: 334px;
+  left: 26px;
+  transform: none;
+  width: 56%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   z-index: 32;
   pointer-events: none;
 }
 .notice {
   background: rgba(255, 247, 228, 0.97);
   border: 3px solid var(--ink);
-  border-radius: 14px;
-  padding: 9px 14px;
+  border-radius: 18px;
+  padding: 14px 20px;
   font-family: 'Nunito', sans-serif;
-  font-size: 17px;
+  font-size: 36px;
   font-weight: 800;
+  line-height: 1.2;
   color: var(--ink);
   text-align: center;
   box-shadow: 0 5px 0 rgba(59, 42, 32, 0.28);
@@ -659,11 +718,11 @@ body.obs-mode .stage-wrapper {
 .notice.grand {
   background: linear-gradient(180deg, #fff3c4 0%, #ffcf4d 100%);
   border-color: #8a5a1b;
-  font-size: 19px;
+  font-size: 42px;
 }
 .notice.join {
   background: rgba(255, 251, 240, 0.95);
-  font-size: 15.5px;
+  font-size: 32px;
 }
 @keyframes noticeIn {
   from { opacity: 0; transform: translateY(-14px) scale(0.96); }
@@ -671,7 +730,7 @@ body.obs-mode .stage-wrapper {
 }
 
 .lb-empty {
-  font-size: 14px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--ink-soft);
   text-align: center;
@@ -902,11 +961,11 @@ body.stacked .quick-dock {
 
 .gift-ticker {
   position: absolute;
-  top: 356px;
+  top: 414px;
   right: 26px;
   z-index: 18;
-  width: 306px;
-  padding: 8px 10px 10px;
+  width: 360px;
+  padding: 10px 12px 12px;
   border-radius: 16px;
   background: rgba(255, 247, 228, 0.95);
   border: 3px solid var(--ink);
@@ -919,8 +978,8 @@ body.stacked .quick-dock {
   margin-bottom: 5px;
   border-bottom: 2px dashed rgba(59, 42, 32, 0.25);
   font-family: 'Baloo 2', 'Nunito', sans-serif;
-  font-size: 15px;
-  letter-spacing: 1.4px;
+  font-size: 22px;
+  letter-spacing: 1.1px;
   text-align: center;
   color: var(--coral-dark);
 }
@@ -934,15 +993,15 @@ body.stacked .quick-dock {
 .gt-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 13.5px;
+  gap: 8px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--ink);
 }
 
 .gt-icon {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   flex: 0 0 auto;
   filter: drop-shadow(0 1px 0 rgba(59, 42, 32, 0.25));
@@ -957,11 +1016,11 @@ body.stacked .quick-dock {
 
 .gt-drink {
   color: var(--mint);
-  font-size: 12.5px;
+  font-size: 20px;
 }
 
 .gt-empty {
-  font-size: 12.5px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--ink-soft);
   text-align: center;
@@ -999,11 +1058,11 @@ body.stacked .quick-dock {
    ========================================================================== */
 .coin-menu {
   position: absolute;
-  top: 470px;
+  top: 500px;
   left: 26px;
   z-index: 18;
-  width: 312px;
-  padding: 8px 10px 10px;
+  width: 360px;
+  padding: 10px 12px 12px;
   border-radius: 16px;
   background: rgba(255, 247, 228, 0.96);
   border: 3px solid var(--ink);
@@ -1016,8 +1075,8 @@ body.stacked .quick-dock {
   margin-bottom: 5px;
   border-bottom: 2px dashed rgba(59, 42, 32, 0.25);
   font-family: 'Baloo 2', 'Nunito', sans-serif;
-  font-size: 15px;
-  letter-spacing: 1.4px;
+  font-size: 30px;
+  letter-spacing: 1.1px;
   text-align: center;
   color: var(--coral-dark);
 }
@@ -1025,21 +1084,21 @@ body.stacked .quick-dock {
 .cm-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .cm-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 13.5px;
+  gap: 8px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--ink);
 }
 
 .cm-drink {
-  width: 26px;
-  height: 26px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
   background: #fff;
@@ -1062,7 +1121,7 @@ body.stacked .quick-dock {
 }
 
 .cm-gift {
-  width: 20px;
-  height: 20px;
+  width: 45px;
+  height: 45px;
   object-fit: contain;
 }
