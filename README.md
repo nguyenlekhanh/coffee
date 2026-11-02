@@ -41,7 +41,7 @@ Install the engine once (the voice models are already in the repo):
 python -m pip install piper-tts
 ```
 
-The admin panel's **Piper Voice** card holds the language selector (English / Vietnamese), the voice list, speech speed, volume, the voice on/off toggle and a test button. TikTok comments are read with the selected voice and language, queued so lines never overlap, truncated to `ttsMaxChars` and filtered for empty or spam messages.
+The admin panel's **Piper Voice** card holds the language selector (English / Vietnamese), the discovered voice list, speech speed, volume, the voice on/off toggle and a test button. Voices are discovered from the files in `config/piper/en` and `config/piper/vn` (`<name>.onnx` plus `<name>.onnx.json`), so adding a model needs no JavaScript or config edit: the server scans on startup, watches the folders while it runs, and the **🔄 Refresh Piper Voices** button rescans on demand. Every voice is listed with its friendly name, gender when `voices.json` provides it, model path and a per-voice **▶ Test** button; voices without gender metadata are still listed. `GET /api/tts/voices` returns the grouped catalog (`en`, `vi`/`vn`) and `tts.refreshVoices` forces a rescan. TikTok comments are read with the selected voice and language, queued so lines never overlap, truncated to `ttsMaxChars` and filtered for empty or spam messages.
 
 ---
 
@@ -93,6 +93,7 @@ The drink is chosen by the gift's **coin value alone** (`diamondCount`): 1, 5, 1
 | --- | --- | --- |
 | `shop.giftOrder` (alias `shop.sendGift`) | `user, giftId` (`rose`/`prayercandle`/`grandceremony`), `units` | Queues a gift drink order |
 | `shop.ttsStatus` | – | Piper engine, executable and voice list |
+| `tts.refreshVoices` | – | Rescan `config/piper` and return the grouped voice catalog |
 
 ---
 
@@ -182,12 +183,21 @@ One TikTok viewer = one persistent game character for the whole live session.
 - **Multiple donations**: each valid coin tier appends an order; the character serves
   them one after another at the counter, showing the drink and its coin value. Combo
   replays are deduplicated by order id.
-- **Limits**: 12 characters on stage, 5 visible waiting slots. Extra viewers wait in a
-  virtual queue off stage; viewers with paid orders are prioritised. When every table
-  is taken, the order becomes takeaway.
-- **Leave**: the current serving animation finishes, the character waves goodbye and
-  walks off screen. The session is kept for 15 minutes so a reconnecting viewer gets
-  the same character back (`shop.leave` / `shop.join`).
+- **Large audiences**: no character cap and no waiting-slot cap. The first eight queue
+  positions are the counter row; every other viewer fills expanding rows across the
+  floor, bodies shrink gently as the crowd grows while names stay on the front rows and
+  every VIP. Entrances are staggered, particles are throttled when the shop is packed,
+  and walker separation is bounded so 50–100 viewers stay smooth. Viewers with paid
+  orders are prioritised. When every table is taken a viewer keeps their drink standing
+  in the shop instead of walking out, so nobody is silently dropped.
+- **Leave**: the drink already on the counter is finished, the character shows
+  “Thanks! See you next live! 👋”, waves and walks off screen; the body is then removed
+  from the stage and from the active roster (sprite, nameplate and VIP effects included).
+  Duplicate departures are ignored. The session is kept for 15 minutes so a reconnecting
+  viewer gets the same character, sprite and identity back (`shop.leave` / `shop.join`);
+  after that the existing new-session behaviour applies. TikTok’s connector exposes no
+  viewer-leave event, so departures arrive through `shop.leave` (stage dock, admin or an
+  external caller) — the client never invents one.
 - **Leaderboard**: coins per viewer for the current live session (top supporters on
   stage), with all-time totals kept separately (`lifetimeLeaderboard`).
 - RPC: `shop.join`, `shop.leave`, `shop.viewerServed`, `shop.viewers` (aliases under

@@ -11,3 +11,5 @@ public/assets/bg_chant.m4a
 .env.example
 __pycache__/
 backup/
+config/piper/
+config/piper/en/piper-en-us-lessac-high.onnx

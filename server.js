@@ -164,11 +164,24 @@ const MYSTERY_DECK = [
 // ============================================================================
 // 3. PIPER TTS WORKER MANAGER (local ONNX voices in config/piper, no downloads)
 // ============================================================================
+function normalizeGender(value) {
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!raw) return null;
+  if (['female', 'f', 'woman', 'girl', 'nữ', 'nu'].includes(raw)) return 'female';
+  if (['male', 'm', 'man', 'boy', 'nam'].includes(raw)) return 'male';
+  return null;
+}
+
 function prettyVoiceName(stem) {
   const cleaned = String(stem || '')
-    .replace(/^(en_US|en_GB|vi_VN)-/i, '')
-    .replace(/\b(medium|low|high|x_low)\b/gi, '')
+    .replace(/^piper[-_]/i, '')
+    .replace(/^(en|vi)[-_][A-Za-z]{2}[-_]/i, '')
+    .replace(/^(en|vi)[-_]/i, '')
+    .replace(/\b(medium|low|high|x_low|x-low)\b/gi, '')
     .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
   if (!cleaned) return String(stem || 'Voice');
   return cleaned
@@ -193,46 +206,227 @@ class PiperTTSManager {
     this.inflight = new Map();
     this.reqCounter = 0;
     this.buffer = '';
+    this.lastScanAt = null;
     this.cacheVoices = this.scanVoices();
+    this.lastScanAt = Date.now();
     this.exe = this.resolvePiperExe();
     this.startWorker();
+    this.watchModels();
+    console.log(
+      `[Piper TTS] Discovered ${this.listVoices().length} valid local voices in ${path.relative(__dirname, this.modelsRoot)}`
+    );
+  }
+
+  // Optional display/gender metadata shipped next to the models.
+  readVoiceMetadata(dir) {
+    const map = new Map();
+    try {
+      const entries = JSON.parse(fs.readFileSync(path.join(dir, 'voices.json'), 'utf8'));
+      for (const entry of Array.isArray(entries) ? entries : []) {
+        const audioPath = String(entry.audio_path || '').replace(/\\/g, '/');
+        const stem = path.basename(audioPath).replace(/\.onnx$/i, '').toLowerCase();
+        if (!stem) continue;
+        map.set(stem, {
+          name: String(entry.name || '').trim(),
+          gender: normalizeGender(entry.gender),
+          description: String(entry.description || '').trim()
+        });
+      }
+    } catch (_) {
+      /* voices.json is optional; discovery must still work without it. */
+    }
+    return map;
   }
 
   // Local models only: config/piper/<language>/<name>.onnx + <name>.onnx.json
   scanVoices() {
     const found = [];
+    const seen = new Set();
     // Vietnamese models live in config/piper/vn and are exposed as language "vi".
     for (const folder of ['en', 'vi', 'vn']) {
       const dir = path.join(this.modelsRoot, folder);
       const language = folder === 'vn' ? 'vi' : folder;
       if (!fs.existsSync(dir)) continue;
-      for (const file of fs.readdirSync(dir)) {
+      const metadata = this.readVoiceMetadata(dir);
+      for (const file of fs.readdirSync(dir).sort()) {
         if (!/\.onnx$/i.test(file)) continue;
+        const id = file.replace(/\.onnx$/i, '');
+        if (seen.has(id)) continue;
+        seen.add(id);
         const modelPath = path.join(dir, file);
         const configPath = `${modelPath}.json`;
-        if (!fs.existsSync(configPath)) continue;
-        let config = {};
-        try {
-          config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        } catch (_) {
-          config = {};
+        const meta = metadata.get(id.toLowerCase()) || {};
+        const warnings = [];
+        let config = null;
+        let problem = null;
+        if (!fs.existsSync(configPath)) {
+          problem = 'missing .onnx.json config';
+        } else {
+          try {
+            config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          } catch (err) {
+            problem = `invalid .onnx.json (${err.message})`;
+          }
         }
-        const id = file.replace(/\.onnx$/i, '');
+        let bytes = 0;
+        try {
+          bytes = fs.statSync(modelPath).size;
+        } catch (_) {
+          bytes = 0;
+        }
+        if (!problem && bytes < 1024) problem = 'model file is empty or truncated';
+        if (!meta.gender) warnings.push('gender metadata missing');
         found.push({
           id,
           language,
-          name: prettyVoiceName(id),
-          sampleRate: (config.audio && config.audio.sample_rate) || 22050,
-          espeak: (config.espeak && config.espeak.voice) || language,
-          path: modelPath
+          name: meta.name && !/[_-]/.test(meta.name) ? meta.name : prettyVoiceName(meta.name || id),
+          gender: meta.gender || null,
+          description: meta.description || '',
+          sampleRate: Number(config && config.audio && config.audio.sample_rate) || 22050,
+          espeak: (config && config.espeak && config.espeak.voice) || language,
+          path: path.relative(__dirname, modelPath).replace(/\\/g, '/'),
+          configPath: path.relative(__dirname, configPath).replace(/\\/g, '/'),
+          bytes,
+          valid: !problem,
+          problem,
+          warnings
         });
       }
     }
-    return found;
+    return found.sort((a, b) =>
+      a.language === b.language ? a.name.localeCompare(b.name) : a.language.localeCompare(b.language)
+    );
+  }
+
+  // The worker rescans config/piper on every request; keep its findings in sync.
+  mergeWorkerVoices(workerVoices = []) {
+    const byId = new Map(this.cacheVoices.map((voice) => [voice.id, voice]));
+    for (const entry of Array.isArray(workerVoices) ? workerVoices : []) {
+      if (!entry || !entry.id) continue;
+      const existing = byId.get(entry.id);
+      if (existing) {
+        existing.sampleRate = Number(entry.sampleRate) || existing.sampleRate;
+        existing.espeak = entry.espeak || existing.espeak;
+        continue;
+      }
+      byId.set(entry.id, {
+        id: entry.id,
+        language: entry.language === 'vi' || entry.language === 'vn' ? 'vi' : entry.language || 'en',
+        name: entry.name || prettyVoiceName(entry.id),
+        gender: null,
+        description: '',
+        sampleRate: Number(entry.sampleRate) || 22050,
+        espeak: entry.espeak || entry.language || 'en',
+        path: '',
+        configPath: '',
+        bytes: 0,
+        valid: true,
+        problem: null,
+        warnings: ['discovered by the TTS worker only']
+      });
+    }
+    this.cacheVoices = [...byId.values()];
   }
 
   listVoices() {
-    return this.workerVoices.length ? this.workerVoices : this.cacheVoices;
+    return this.cacheVoices.filter((voice) => voice.valid !== false);
+  }
+
+  voicePayload(voice) {
+    return {
+      id: voice.id,
+      name: voice.name,
+      friendlyName: `${voice.name} · ${voice.language === 'vi' ? 'Vietnamese' : 'English'}`,
+      language: voice.language,
+      gender: voice.gender || null,
+      description: voice.description || '',
+      path: voice.path || '',
+      configPath: voice.configPath || '',
+      sampleRate: voice.sampleRate || 22050,
+      valid: voice.valid !== false,
+      problem: voice.problem || null,
+      warnings: Array.isArray(voice.warnings) ? voice.warnings : []
+    };
+  }
+
+  // Grouped catalog used by the admin panel and the announcer.
+  getCatalog() {
+    const voices = this.cacheVoices.map((voice) => this.voicePayload(voice));
+    const en = voices.filter((voice) => voice.language === 'en');
+    const vi = voices.filter((voice) => voice.language === 'vi');
+    return {
+      en,
+      vi,
+      vn: vi,
+      total: voices.length,
+      valid: voices.filter((voice) => voice.valid).length,
+      languages: ['en', 'vi'],
+      modelsRoot: path.relative(__dirname, this.modelsRoot).replace(/\\/g, '/'),
+      lastScanAt: this.lastScanAt || null,
+      skipped: voices
+        .filter((voice) => !voice.valid)
+        .map((voice) => ({ id: voice.id, path: voice.path, problem: voice.problem }))
+    };
+  }
+
+  requestWorkerVoices() {
+    if (!this.proc || !this.ready) return;
+    try {
+      this.proc.stdin.write(JSON.stringify({ cmd: 'voices' }) + '\n');
+    } catch (_) {}
+  }
+
+  refreshVoices(trigger = 'manual') {
+    const signature = (voices) =>
+      voices
+        .map((voice) => `${voice.id}:${voice.valid === false ? 0 : 1}`)
+        .sort()
+        .join('|');
+    const before = signature(this.cacheVoices);
+    this.cacheVoices = this.scanVoices();
+    this.lastScanAt = Date.now();
+    const changed = signature(this.cacheVoices) !== before;
+    this.requestWorkerVoices();
+    if (changed || trigger !== 'watch') {
+      const catalog = this.getCatalog();
+      console.log(
+        `[Piper TTS] Voice catalog refreshed (${trigger}) · ${catalog.valid}/${catalog.total} playable · en:${catalog.en.length} vi:${catalog.vi.length}`
+      );
+      broadcastNotification('tts.status', this.getStatus());
+      return catalog;
+    }
+    return this.getCatalog();
+  }
+
+  // Adding a model while the server runs is noticed without a restart.
+  watchModels() {
+    if (this.watchers) return;
+    const dirs = ['en', 'vi', 'vn']
+      .map((folder) => path.join(this.modelsRoot, folder))
+      .filter((dir) => fs.existsSync(dir));
+    if (!dirs.length) return;
+    let timer = null;
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          this.refreshVoices('watch');
+        } catch (err) {
+          console.warn('[Piper TTS] Voice rescan failed:', err.message);
+        }
+      }, 800);
+      if (timer.unref) timer.unref();
+    };
+    this.watchers = dirs
+      .map((dir) => {
+        try {
+          return fs.watch(dir, schedule);
+        } catch (err) {
+          console.warn(`[Piper TTS] Cannot watch ${dir}:`, err.message);
+          return null;
+        }
+      })
+      .filter(Boolean);
   }
 
   voicesFor(language) {
@@ -379,6 +573,7 @@ class PiperTTSManager {
       this.status = 'ready';
       this.version = msg.version || null;
       this.workerVoices = Array.isArray(msg.voices) ? msg.voices : [];
+      this.mergeWorkerVoices(this.workerVoices);
       if (msg.exe) this.exe = msg.exe;
       if (msg.exeKind) this.exeKind = msg.exeKind;
       const languages = this.listVoices().reduce((acc, voice) => {
@@ -393,6 +588,9 @@ class PiperTTSManager {
       broadcastNotification('tts.status', this.getStatus());
       // Warm the selected voice so the first live comment is spoken instantly.
       this.warm(state.settings.ttsVoice, state.settings.ttsLanguage);
+    } else if (msg.type === 'voices') {
+      this.mergeWorkerVoices(Array.isArray(msg.voices) ? msg.voices : []);
+      broadcastNotification('tts.status', this.getStatus());
     } else if (msg.type === 'warning') {
       console.warn('[Piper TTS]', msg.message);
       this.error = msg.message || this.error;
@@ -412,12 +610,7 @@ class PiperTTSManager {
   }
 
   getStatus() {
-    const voices = this.listVoices().map((voice) => ({
-      id: voice.id,
-      language: voice.language,
-      name: voice.name,
-      sampleRate: voice.sampleRate
-    }));
+    const voices = this.listVoices().map((voice) => this.voicePayload(voice));
     return {
       ready: this.ready,
       status: this.status,
@@ -425,13 +618,15 @@ class PiperTTSManager {
       version: this.version,
       executable: this.exe,
       executableKind: this.exeKind,
-      modelsRoot: this.modelsRoot,
+      modelsRoot: path.relative(__dirname, this.modelsRoot).replace(/\\/g, '/'),
       languages: ['en', 'vi'],
       language: state.settings.ttsLanguage,
       voice: state.settings.ttsVoice,
       speed: state.settings.ttsSpeed,
       volume: state.settings.ttsVolume,
       voices,
+      catalog: this.getCatalog(),
+      lastScanAt: this.lastScanAt || null,
       error: this.error
     };
   }
@@ -562,6 +757,238 @@ function loadState() {
 
 const state = loadState();
 
+// ============================================================================
+// 4a. VOICE CHARACTER PROFILES
+// Four independent Piper profiles (male seller, female seller, announcer,
+// customer). Settings live on the server so Admin and Stage always agree and
+// survive restarts. Piper models are still discovered dynamically.
+// ============================================================================
+const VOICE_PROFILE_IDS = ['maleSeller', 'femaleSeller', 'announcer', 'customer'];
+const ANNOUNCER_MODES = ['maleSeller', 'femaleSeller', 'alternate', 'random'];
+const SELLER_PROFILE_IDS = ['maleSeller', 'femaleSeller'];
+
+const VOICE_PROFILE_META = {
+  maleSeller: {
+    label: 'Male Seller',
+    icon: '🧑‍🍳',
+    role: 'seller',
+    personality: 'Friendly, energetic, casual American shopkeeper — occasionally humorous.'
+  },
+  femaleSeller: {
+    label: 'Female Seller',
+    icon: '👩‍🍳',
+    role: 'seller',
+    personality: 'Warm, cheerful, welcoming American shopkeeper — occasionally playful.'
+  },
+  announcer: {
+    label: 'AI Announcer',
+    icon: '📣',
+    role: 'announcer',
+    personality: 'Uses the selected seller profile with that seller\'s complete voice settings.'
+  },
+  customer: {
+    label: 'Customer Responses',
+    icon: '🙋',
+    role: 'customer',
+    personality: 'Customer voice, independent of both sellers.'
+  }
+};
+
+// Automatic TikTok speech is routed by role, never by a hardcoded voice.
+const VOICE_ROUTES = {
+  giftOrder: 'seller',
+  partyOrder: 'seller',
+  followGuest: 'seller',
+  viewerJoin: 'seller',
+  serveDrink: 'seller',
+  commentOrder: 'seller',
+  announcement: 'announcer',
+  customerResponse: 'customer'
+};
+
+// The installed engine (piper-tts 1.8.0) exposes no pitch control. Never fake it.
+const VOICE_CAPABILITIES = {
+  speed: true,
+  volume: true,
+  pitch: false,
+  pitchReason:
+    'The installed piper-tts engine exposes speaker_id, length_scale, noise_scale, noise_w_scale, normalize_audio and volume — there is no pitch parameter.',
+  engineParameters: ['speaker_id', 'length_scale', 'noise_scale', 'noise_w_scale', 'normalize_audio', 'volume'],
+  speedRange: [0.5, 2],
+  note: 'Volume is applied per speech item at playback, so a settings change never alters audio already queued or playing.'
+};
+
+function profileNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function defaultVoiceProfiles() {
+  const english = piperTts.voicesFor('en');
+  const male = english.find((voice) => voice.gender === 'male') || english[0] || null;
+  const female = english.find((voice) => voice.gender === 'female') || english[1] || english[0] || null;
+  // The customer voice deliberately differs from both sellers when possible.
+  const customer =
+    english.find((voice) => voice.id !== (male && male.id) && voice.id !== (female && female.id)) ||
+    female ||
+    male ||
+    null;
+  return {
+    maleSeller: { enabled: true, voice: male ? male.id : '', language: 'en', speed: 1, volume: 0.9 },
+    femaleSeller: { enabled: true, voice: female ? female.id : '', language: 'en', speed: 1.05, volume: 0.9 },
+    announcer: { enabled: true, voice: '', language: 'en', speed: 1, volume: 0.9, mode: 'alternate' },
+    customer: { enabled: true, voice: customer ? customer.id : '', language: 'en', speed: 1, volume: 0.85 }
+  };
+}
+
+function normalizeVoiceProfiles(raw) {
+  const defaults = defaultVoiceProfiles();
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const normalized = {};
+  for (const id of VOICE_PROFILE_IDS) {
+    const base = defaults[id];
+    const given = source[id] && typeof source[id] === 'object' ? source[id] : {};
+    const entry = {
+      id,
+      enabled: given.enabled !== false,
+      voice: typeof given.voice === 'string' ? given.voice.trim().slice(0, 80) : base.voice,
+      language: given.language === 'vi' ? 'vi' : given.language === 'en' ? 'en' : base.language,
+      speed: Math.round(clamp(profileNumber(given.speed, base.speed), 0.5, 2) * 100) / 100,
+      volume: Math.round(clamp(profileNumber(given.volume, base.volume), 0, 1) * 100) / 100
+    };
+    if (id === 'announcer') {
+      entry.mode = ANNOUNCER_MODES.includes(given.mode) ? given.mode : base.mode;
+    }
+    normalized[id] = entry;
+  }
+  return normalized;
+}
+
+function ensureVoiceProfiles() {
+  if (!state.voiceProfiles || typeof state.voiceProfiles !== 'object') state.voiceProfiles = {};
+  state.voiceProfiles = normalizeVoiceProfiles(state.voiceProfiles);
+  return state.voiceProfiles;
+}
+
+// A configured voice that vanished from config/piper is reported, not overwritten.
+function resolveProfileVoice(profile) {
+  const language = profile.language === 'vi' ? 'vi' : 'en';
+  const voices = piperTts.voicesFor(language);
+  const configured = String(profile.voice || '').trim();
+  const match = configured ? voices.find((voice) => voice.id === configured) : null;
+  const fallback = (voices[0] && voices[0].id) || piperTts.defaultVoice('en') || '';
+  const fallbackVoice = fallback ? piperTts.listVoices().find((voice) => voice.id === fallback) : null;
+  return {
+    language,
+    voice: match ? match.id : fallback,
+    name: match ? match.name : fallbackVoice ? fallbackVoice.name : '',
+    gender: match ? match.gender || null : fallbackVoice ? fallbackVoice.gender || null : null,
+    missing: Boolean(configured) && !match,
+    configured
+  };
+}
+
+let sellerTurn = 0;
+let announcerTurn = 0;
+
+function enabledSellers(profiles) {
+  return SELLER_PROFILE_IDS.map((id) => profiles[id]).filter((profile) => profile && profile.enabled !== false);
+}
+
+// Seller dialogue alternates so the same sentence never lands on one seller twice.
+function nextSellerProfile() {
+  const profiles = ensureVoiceProfiles();
+  const sellers = enabledSellers(profiles);
+  if (!sellers.length) return null;
+  const choice = sellers[sellerTurn % sellers.length];
+  sellerTurn += 1;
+  return choice;
+}
+
+function resolveAnnouncerSeller() {
+  const profiles = ensureVoiceProfiles();
+  const mode = profiles.announcer.mode || 'alternate';
+  const sellers = enabledSellers(profiles);
+  if (!sellers.length) return null;
+  if (mode === 'maleSeller') return profiles.maleSeller.enabled !== false ? profiles.maleSeller : sellers[0];
+  if (mode === 'femaleSeller') return profiles.femaleSeller.enabled !== false ? profiles.femaleSeller : sellers[0];
+  if (mode === 'random') return sellers[Math.floor(Math.random() * sellers.length)];
+  const choice = sellers[announcerTurn % sellers.length];
+  announcerTurn += 1;
+  return choice;
+}
+
+function activeProfileForRole(role) {
+  const profiles = ensureVoiceProfiles();
+  if (role === 'customer') return profiles.customer.enabled !== false ? profiles.customer : null;
+  if (role === 'announcer') {
+    if (profiles.announcer.enabled === false) return null;
+    // An exact announcer voice overrides the seller-selection modes.
+    if (profiles.announcer.voice) return profiles.announcer;
+    return resolveAnnouncerSeller() || null;
+  }
+  return nextSellerProfile();
+}
+
+// Resolved once when speech is queued. Every item keeps this snapshot, so later
+// profile edits cannot change audio that is already queued or playing.
+function speechFor(role) {
+  const profiles = ensureVoiceProfiles();
+  const profile = activeProfileForRole(role);
+  if (!profile) {
+    return {
+      ttsProfile: role === 'customer' ? 'customer' : role === 'announcer' ? 'announcer' : 'maleSeller',
+      ttsProfileEnabled: false,
+      ttsVoice: state.settings.ttsVoice,
+      ttsLanguage: state.settings.ttsLanguage,
+      ttsSpeed: state.settings.ttsSpeed,
+      ttsVolume: state.settings.ttsVolume
+    };
+  }
+  const resolved = resolveProfileVoice(profile);
+  return {
+    ttsProfile: profile.id,
+    ttsProfileEnabled: true,
+    ttsVoice: resolved.voice,
+    ttsLanguage: resolved.language,
+    ttsSpeed: profile.speed,
+    ttsVolume: profile.volume,
+    ttsVoiceMissing: resolved.missing
+  };
+}
+
+function voiceProfilesSnapshot() {
+  const profiles = ensureVoiceProfiles();
+  const entries = {};
+  for (const id of VOICE_PROFILE_IDS) {
+    const profile = profiles[id];
+    const resolved = resolveProfileVoice(profile);
+    const meta = VOICE_PROFILE_META[id];
+    entries[id] = {
+      ...profile,
+      label: meta.label,
+      icon: meta.icon,
+      role: meta.role,
+      personality: meta.personality,
+      resolvedVoice: resolved.voice,
+      resolvedVoiceName: resolved.name,
+      gender: resolved.gender,
+      missing: resolved.missing,
+      missingVoice: resolved.missing ? resolved.configured : ''
+    };
+  }
+  return {
+    profiles: entries,
+    ids: [...VOICE_PROFILE_IDS],
+    announcerMode: profiles.announcer.mode,
+    announcerModes: [...ANNOUNCER_MODES],
+    routes: { ...VOICE_ROUTES },
+    capabilities: { ...VOICE_CAPABILITIES },
+    sellerTurn,
+    savedAt: state.voiceProfilesSavedAt || null
+  };
+}
+
 let saveTimer = null;
 function saveState() {
   clearTimeout(saveTimer);
@@ -577,7 +1004,8 @@ function saveState() {
       totalCoins: state.totalCoins,
       recentGifts: state.recentGifts.slice(0, 12),
       supporters: state.supporters,
-      settings: state.settings
+      settings: state.settings,
+      voiceProfiles: state.voiceProfiles || null
     };
     fs.promises.writeFile(STATE_FILE, JSON.stringify(toSave, null, 2), 'utf8').catch((e) => {
       console.error('[State] Write failed:', e.message);
@@ -769,7 +1197,10 @@ function celebrationFor(coins) {
   return { tier: 'none', label: '', coins: value };
 }
 
-const VIEWER_LIMITS = { active: 12, visibleWaiting: 5, ttlMs: 15 * 60 * 1000 };
+// No character cap and no waiting-slot cap: every viewer on stage is eligible to
+// appear. Only the retention window is bounded, so a returning viewer keeps their
+// identity (and their character) for 15 minutes after leaving.
+const VIEWER_RETENTION_MS = 15 * 60 * 1000;
 const CUSTOMER_SPRITE_COUNT = 10;
 
 const viewerSessions = new Map();
@@ -807,6 +1238,33 @@ function viewerKey(user, uniqueId) {
   return `n:${sanitizeUserName(user || 'guest').toLowerCase()}`;
 }
 
+// A departure can arrive as anything the client has: the internal viewerId, a
+// uniqueId, or just the display name. Resolve the one record instead of creating
+// a second viewer (or missing the departure and leaving a ghost on stage).
+function findViewerRecord(params = {}) {
+  const wantedId = String(params.viewerId || params.viewerID || params.id || '').trim();
+  if (wantedId) {
+    for (const viewer of viewerSessions.values()) {
+      if (viewer.id === wantedId) return viewer;
+    }
+  }
+  const byKey = viewerSessions.get(viewerKey(params.user || params.uniqueId, params.uniqueId));
+  if (byKey) return byKey;
+  const wantedUid = String(params.uniqueId || '').trim().toLowerCase();
+  if (wantedUid) {
+    for (const viewer of viewerSessions.values()) {
+      if (String(viewer.uniqueId || '').toLowerCase() === wantedUid) return viewer;
+    }
+  }
+  const wantedName = sanitizeUserName(params.user || '').toLowerCase();
+  if (wantedName && wantedName !== 'guest') {
+    for (const viewer of viewerSessions.values()) {
+      if (String(viewer.name || '').toLowerCase() === wantedName) return viewer;
+    }
+  }
+  return null;
+}
+
 // Gift senders jump ahead of passive viewers; ties fall back to arrival order.
 function activeViewers() {
   return [...viewerSessions.values()]
@@ -819,7 +1277,7 @@ function activeViewers() {
 
 function viewerRank(viewer) {
   const index = activeViewers().findIndex((entry) => entry.id === viewer.id);
-  return index === -1 ? VIEWER_LIMITS.active : index;
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
 // Spread characters over the ten customer sprites instead of cloning faces.
@@ -858,8 +1316,9 @@ function viewerSnapshot(viewer, rank = viewerRank(viewer)) {
     joinedAt: viewer.joinedAt,
     leftAt: viewer.leftAt || 0,
     rank,
-    visible: rank < VIEWER_LIMITS.active,
-    holding: rank >= VIEWER_LIMITS.visibleWaiting,
+    // Every active viewer is on stage; nothing is parked off-stage anymore.
+    visible: !viewer.leftAt,
+    holding: false,
     pendingOrders: viewer.orders.length,
     orders: viewer.orders.slice(0, 5)
   };
@@ -874,7 +1333,7 @@ function ensureViewer(params = {}) {
   let created = false;
   let rejoined = false;
 
-  if (viewer && viewer.leftAt && now - viewer.leftAt > VIEWER_LIMITS.ttlMs) {
+  if (viewer && viewer.leftAt && now - viewer.leftAt > VIEWER_RETENTION_MS) {
     viewerSessions.delete(key);
     viewer = null;
   }
@@ -979,7 +1438,7 @@ function enqueueViewerOrder(viewer, order) {
 setInterval(() => {
   const now = Date.now();
   for (const [key, viewer] of viewerSessions) {
-    if (viewer.leftAt && now - viewer.leftAt > VIEWER_LIMITS.ttlMs) viewerSessions.delete(key);
+    if (viewer.leftAt && now - viewer.leftAt > VIEWER_RETENTION_MS) viewerSessions.delete(key);
   }
 }, 60 * 1000).unref?.();
 
@@ -1024,15 +1483,18 @@ function getPublicState() {
     },
     viewerSummary: {
       active: activeViewers().length,
-      maxActive: VIEWER_LIMITS.active,
-      visibleWaiting: VIEWER_LIMITS.visibleWaiting,
-      holding: Math.max(0, activeViewers().length - VIEWER_LIMITS.visibleWaiting),
-      recentlyLeft: [...viewerSessions.values()].filter((viewer) => viewer.leftAt).length
+      total: viewerSessions.size,
+      visible: activeViewers().length,
+      holding: 0,
+      recentlyLeft: [...viewerSessions.values()].filter((viewer) => viewer.leftAt).length,
+      retentionMs: VIEWER_RETENTION_MS
     },
     recentEvents: state.recentEvents.slice(0, 12),
     settings: state.settings,
     tiktok: tiktokSnapshot(),
-    tts: piperTts.getStatus()
+    tts: piperTts.getStatus(),
+    voiceProfiles: voiceProfilesSnapshot(),
+    voiceRoutes: { ...VOICE_ROUTES }
   };
 }
 
@@ -1085,9 +1547,7 @@ const Actions = {
       message: note,
       vip: Boolean(params.vip),
       ttsText,
-      ttsVoice: state.settings.ttsVoice,
-      ttsLanguage: state.settings.ttsLanguage,
-      ttsSpeed: state.settings.ttsSpeed
+      ...speechFor('seller')
     });
 
     saveState();
@@ -1121,9 +1581,7 @@ const Actions = {
       count,
       tip,
       ttsText: '',
-      ttsVoice: state.settings.ttsVoice,
-      ttsLanguage: state.settings.ttsLanguage,
-      ttsSpeed: state.settings.ttsSpeed
+      ...speechFor('seller')
     });
 
     saveState();
@@ -1167,9 +1625,7 @@ const Actions = {
       vip: true,
       message: 'New follower: free drink!',
       ttsText,
-      ttsVoice: state.settings.ttsVoice,
-      ttsLanguage: state.settings.ttsLanguage,
-      ttsSpeed: state.settings.ttsSpeed
+      ...speechFor('seller')
     });
 
     saveState();
@@ -1284,9 +1740,7 @@ const Actions = {
       tip,
       message: `${tier.coins} coins → ${drink.name}`,
       ttsText,
-      ttsVoice: state.settings.ttsVoice,
-      ttsLanguage: state.settings.ttsLanguage,
-      ttsSpeed: state.settings.ttsSpeed
+      ...speechFor('seller')
     });
 
     saveState();
@@ -1348,9 +1802,7 @@ const Actions = {
       tip,
       message: giftName,
       ttsText,
-      ttsVoice: state.settings.ttsVoice,
-      ttsLanguage: state.settings.ttsLanguage,
-      ttsSpeed: state.settings.ttsSpeed
+      ...speechFor('seller')
     });
 
     saveState();
@@ -1399,9 +1851,7 @@ const Actions = {
       tip,
       message: card.title,
       ttsText,
-      ttsVoice: state.settings.ttsVoice,
-      ttsLanguage: state.settings.ttsLanguage,
-      ttsSpeed: state.settings.ttsSpeed
+      ...speechFor('seller')
     });
 
     saveState();
@@ -1452,9 +1902,7 @@ const Actions = {
       tip,
       message: text,
       ttsText,
-      ttsVoice: state.settings.ttsVoice,
-      ttsLanguage: state.settings.ttsLanguage,
-      ttsSpeed: state.settings.ttsSpeed
+      ...speechFor('seller')
     });
 
     saveState();
@@ -1478,8 +1926,8 @@ const Actions = {
       rejoined,
       duplicate: !created && !rejoined,
       rank,
-      visible: rank < VIEWER_LIMITS.active,
-      holding: rank >= VIEWER_LIMITS.visibleWaiting,
+      visible: true,
+      holding: false,
       pendingOrders: viewer.orders.length,
       message: created ? 'Joined the live' : rejoined ? 'Came back' : 'Already in the shop',
       ttsText: ''
@@ -1489,10 +1937,10 @@ const Actions = {
   },
 
   viewerLeave(params = {}) {
-    const key = viewerKey(params.user || params.uniqueId, params.uniqueId);
-    const viewer = viewerSessions.get(key);
+    const viewer = findViewerRecord(params);
     if (!viewer) return { ok: false, reason: 'Unknown viewer' };
-    if (viewer.leftAt) return { ok: true, alreadyLeft: true, viewer: viewerSnapshot(viewer, VIEWER_LIMITS.active) };
+    // Duplicate departures are acknowledged without broadcasting a second ghost.
+    if (viewer.leftAt) return { ok: true, alreadyLeft: true, viewer: viewerSnapshot(viewer, 0) };
     viewer.leftAt = Date.now();
     viewer.lastSeenAt = viewer.leftAt;
     const event = pushEventLog({
@@ -1511,9 +1959,10 @@ const Actions = {
 
   // The stage reports a finished order so the personal queue stays accurate.
   viewerServed(params = {}) {
-    const key = viewerKey(params.user || params.uniqueId, params.uniqueId);
-    const viewer = viewerSessions.get(key);
+    const viewer = findViewerRecord(params);
     if (!viewer) return { ok: false, reason: 'Unknown viewer' };
+    // A serve confirmation that arrives after the departure must not restore them.
+    if (viewer.leftAt) return { ok: false, reason: 'Viewer already left', left: true };
     const orderId = String(params.orderId || '');
     const before = viewer.orders.length;
     if (orderId) {
@@ -1539,7 +1988,7 @@ const Actions = {
         drinks: liveSession.drinks,
         served: liveSession.served
       },
-      limits: VIEWER_LIMITS,
+      limits: { retentionMs: VIEWER_RETENTION_MS, maxActive: null, visibleWaiting: null },
       viewers: activeViewers().map((viewer, index) => viewerSnapshot(viewer, index)),
       leaderboard: getLeaderboard(8),
       lifetimeLeaderboard: getLifetimeLeaderboard(8)
@@ -1689,6 +2138,99 @@ const Actions = {
     broadcastNotification('shop.reset', { soft: false });
     broadcastNotification('temple.state', getPublicState());
     return getPublicState();
+  },
+
+  // ------------------------------------------------ voice character profiles
+  getVoiceProfiles() {
+    return voiceProfilesSnapshot();
+  },
+
+  updateVoiceProfile(params = {}) {
+    const id = String(params.profile || params.id || '').trim();
+    if (!VOICE_PROFILE_IDS.includes(id)) {
+      return { ok: false, error: `Unknown voice profile: ${id || '(none)'}` };
+    }
+    const profiles = ensureVoiceProfiles();
+    const current = profiles[id];
+    const patch = params.patch && typeof params.patch === 'object' ? params.patch : params;
+    const next = { ...current };
+
+    if (typeof patch.enabled === 'boolean') next.enabled = patch.enabled;
+    if (typeof patch.voice === 'string') next.voice = patch.voice.trim().slice(0, 80);
+    if (typeof patch.language === 'string') {
+      next.language = patch.language.toLowerCase() === 'vi' ? 'vi' : 'en';
+    }
+    if (patch.speed !== undefined) {
+      next.speed = Math.round(clamp(profileNumber(patch.speed, current.speed), 0.5, 2) * 100) / 100;
+    }
+    if (patch.volume !== undefined) {
+      next.volume = Math.round(clamp(profileNumber(patch.volume, current.volume), 0, 1) * 100) / 100;
+    }
+    if (id === 'announcer' && typeof patch.mode === 'string' && ANNOUNCER_MODES.includes(patch.mode)) {
+      next.mode = patch.mode;
+    }
+
+    // A voice that is not in the catalog is kept as configured and resolved to a
+    // safe fallback at speak time; settings are never silently rewritten.
+    profiles[id] = next;
+    state.voiceProfilesSavedAt = new Date().toISOString();
+    saveState();
+    broadcastNotification('temple.state', getPublicState());
+    return { ok: true, id, profile: voiceProfilesSnapshot().profiles[id], voiceProfiles: voiceProfilesSnapshot() };
+  },
+
+  resetVoiceProfiles() {
+    state.voiceProfiles = normalizeVoiceProfiles(defaultVoiceProfiles());
+    state.voiceProfilesSavedAt = new Date().toISOString();
+    sellerTurn = 0;
+    announcerTurn = 0;
+    saveState();
+    broadcastNotification('temple.state', getPublicState());
+    return { ok: true, voiceProfiles: voiceProfilesSnapshot() };
+  },
+
+  // Speak one line through an exact profile (Admin test buttons + customer route).
+  async testVoiceProfile(params = {}) {
+    const id = String(params.profile || params.id || '').trim();
+    if (!VOICE_PROFILE_IDS.includes(id)) {
+      return { ok: false, error: `Unknown voice profile: ${id || '(none)'}` };
+    }
+    const profiles = ensureVoiceProfiles();
+    const requested = profiles[id];
+    if (requested.enabled === false) {
+      return { ok: false, error: `${VOICE_PROFILE_META[id].label} is disabled` };
+    }
+    // Testing profile C must exercise its configured mode (male/female/alternate/random),
+    // not silently fall back to the announcer profile's own defaults.
+    const profile = id === 'announcer' ? activeProfileForRole('announcer') || requested : requested;
+    const resolved = resolveProfileVoice(profile);
+    const text = String(params.text || '').trim().slice(0, 220);
+    if (!text) return { ok: false, error: 'Empty preview text' };
+    const result = await piperTts.synthesize(text, {
+      voice: resolved.voice,
+      language: resolved.language,
+      speed: profile.speed
+    });
+    if (!result.ok) return { ...result, profile: id };
+    const payload = {
+      text,
+      voice: result.voice,
+      language: result.language,
+      speed: result.speed,
+      volume: profile.volume,
+      profile: id,
+      url: result.url
+    };
+    if (params.broadcast !== false) broadcastNotification('tts.play', payload);
+    return {
+      ...result,
+      profile: id,
+      resolvedProfile: profile.id,
+      profileLabel: VOICE_PROFILE_META[id].label,
+      speed: profile.speed,
+      volume: profile.volume,
+      missingVoice: resolved.missing ? resolved.configured : ''
+    };
   }
 };
 
@@ -2310,26 +2852,63 @@ async function handleRpcCall(method, params = {}) {
 
     case 'temple.speak':
     case 'shop.speak': {
-      const res = await piperTts.synthesize(params.text, {
-        voice: params.voice,
-        language: params.language,
-        speed: params.speed
-      });
+      // Optional profile routing: { profile: 'customer' | 'maleSeller' | ... }
+      let speed = params.speed;
+      let language = params.language;
+      let voice = params.voice;
+      let volume;
+      let profileId = '';
+      if (params.profile && VOICE_PROFILE_IDS.includes(String(params.profile))) {
+        profileId = String(params.profile);
+        const snapshot = voiceProfilesSnapshot().profiles[profileId];
+        if (!snapshot || snapshot.enabled === false) {
+          return { ok: false, error: `${VOICE_PROFILE_META[profileId].label} is disabled` };
+        }
+        voice = snapshot.resolvedVoice || voice;
+        language = snapshot.language;
+        speed = snapshot.speed;
+        volume = snapshot.volume;
+      }
+      const res = await piperTts.synthesize(params.text, { voice, language, speed });
       if (res.ok && params.broadcast !== false) {
         broadcastNotification('tts.play', {
           text: params.text,
           voice: res.voice,
           language: res.language,
           speed: res.speed,
+          volume,
+          profile: profileId,
           url: res.url
         });
       }
       return res;
     }
 
+    case 'voice.getProfiles':
+    case 'shop.voiceProfiles':
+      return voiceProfilesSnapshot();
+
+    case 'voice.updateProfile':
+      return Actions.updateVoiceProfile(params);
+
+    case 'voice.resetProfiles':
+      return Actions.resetVoiceProfiles();
+
+    case 'voice.test':
+      return Actions.testVoiceProfile(params);
+
     case 'temple.ttsStatus':
     case 'shop.ttsStatus':
       return piperTts.getStatus();
+
+    case 'tts.refreshVoices':
+    case 'temple.refreshVoices':
+    case 'shop.refreshVoices':
+      return piperTts.refreshVoices('rpc');
+
+    case 'tts.voices':
+    case 'shop.ttsVoices':
+      return piperTts.getCatalog();
 
     case 'shop.giftMap':
       return coinMenuEntries();
@@ -2410,6 +2989,11 @@ app.post('/rpc', async (req, res) => {
       error: { code: -32000, message: err.message || 'Server error' }
     });
   }
+});
+
+app.get('/api/tts/voices', (req, res) => {
+  const fresh = String(req.query?.refresh || '') === '1';
+  res.json(fresh ? piperTts.refreshVoices('http') : piperTts.getCatalog());
 });
 
 app.all('/api/tts', async (req, res) => {

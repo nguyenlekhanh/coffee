@@ -80,6 +80,40 @@
     }
   };
 
+  // Catalog discovered by the server from config/piper (no filenames are hardcoded).
+  // VOICE_MAP above is only a fallback for the offline / first-load case.
+  let voiceCatalog = { en: [], vi: [] };
+
+  // Server-owned voice character profiles. Null until the stage receives state.
+  let voiceProfiles = null;
+  let announcerTurn = 0;
+
+  function setVoiceProfiles(snapshot) {
+    if (!snapshot || !snapshot.profiles) return;
+    voiceProfiles = snapshot;
+  }
+
+  function setVoiceCatalog(catalog) {
+    if (!catalog) return;
+    const byLanguage = { en: [], vi: [] };
+    const grouped = !Array.isArray(catalog) && (Array.isArray(catalog.en) || Array.isArray(catalog.vi));
+    if (grouped) {
+      for (const voice of catalog.en || []) {
+        if (voice && voice.id && voice.valid !== false) byLanguage.en.push(voice);
+      }
+      for (const voice of catalog.vi || catalog.vn || []) {
+        if (voice && voice.id && voice.valid !== false) byLanguage.vi.push(voice);
+      }
+    } else if (Array.isArray(catalog)) {
+      for (const voice of catalog) {
+        if (!voice || !voice.id || voice.valid === false) continue;
+        const language = voice.language === 'vi' || voice.language === 'vn' ? 'vi' : 'en';
+        byLanguage[language].push(voice);
+      }
+    }
+    voiceCatalog = byLanguage;
+  }
+
   function readJSON(key, fallback) {
     try {
       const raw = localStorage.getItem(key);
@@ -156,10 +190,19 @@
 
   function pickVoice(language, mode) {
     const lang = language === 'vi' ? 'vi' : 'en';
-    const byGender = VOICE_MAP[lang] || VOICE_MAP.en;
-    const pool = mode === 'male' ? byGender.male : mode === 'female' ? byGender.female : [...byGender.female, ...byGender.male];
-    if (!pool.length) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
+    const discovered = Array.isArray(voiceCatalog[lang]) ? voiceCatalog[lang] : [];
+    let pool = discovered;
+    if (discovered.length && mode !== 'random') {
+      const byGender = discovered.filter((voice) => voice.gender === mode);
+      // Voices without gender metadata stay playable instead of disappearing.
+      if (byGender.length) pool = byGender;
+    }
+    if (pool.length) return pool[Math.floor(Math.random() * pool.length)].id;
+    const fallback = VOICE_MAP[lang] || VOICE_MAP.en;
+    const ids =
+      mode === 'male' ? fallback.male : mode === 'female' ? fallback.female : [...fallback.female, ...fallback.male];
+    if (!ids.length) return null;
+    return ids[Math.floor(Math.random() * ids.length)];
   }
 
   class ShopAnnouncer {
@@ -180,6 +223,10 @@
       if (this.channel) {
         this.channel.onmessage = (event) => this.handleMessage(event.data);
       }
+      this.voiceCatalog = voiceCatalog;
+      this.voiceProfiles = voiceProfiles;
+      this.refreshVoiceCatalog();
+      setInterval(() => this.refreshVoiceCatalog(), 120000);
       window.addEventListener('storage', (event) => {
         if (event.key === SETTINGS_KEY || event.key === LIST_KEY) this.reload();
       });
@@ -206,6 +253,53 @@
       if (msg.type === 'control') {
         this.saveSettings({ running: msg.action !== 'stop' });
       }
+    }
+
+    // Keep gender pools aligned with the server's filesystem discovery.
+    setVoiceCatalog(catalog) {
+      setVoiceCatalog(catalog);
+      this.voiceCatalog = voiceCatalog;
+    }
+
+    // Profile C: use the male seller, female seller, alternate or random seller.
+    // The chosen seller contributes its complete voice, speed, volume and language.
+    setVoiceProfiles(snapshot) {
+      setVoiceProfiles(snapshot);
+      this.voiceProfiles = voiceProfiles;
+    }
+
+    resolvedProfile() {
+      const snapshot = this.voiceProfiles || voiceProfiles;
+      const profiles = snapshot && snapshot.profiles;
+      if (!profiles) return null;
+      const announcer = profiles.announcer;
+      const sellers = ['maleSeller', 'femaleSeller']
+        .map((id) => profiles[id])
+        .filter((profile) => profile && profile.enabled !== false);
+      if (!announcer || announcer.enabled === false) return sellers.length ? sellers[0] : null;
+      // An exact announcer voice (profile C) overrides the seller-selection modes.
+      if (announcer.voice) return announcer;
+      if (!sellers.length) return announcer;
+      const mode = announcer.mode || snapshot.announcerMode || 'alternate';
+      if (mode === 'maleSeller') {
+        return profiles.maleSeller && profiles.maleSeller.enabled !== false ? profiles.maleSeller : sellers[0];
+      }
+      if (mode === 'femaleSeller') {
+        return profiles.femaleSeller && profiles.femaleSeller.enabled !== false ? profiles.femaleSeller : sellers[0];
+      }
+      if (mode === 'random') return sellers[Math.floor(Math.random() * sellers.length)];
+      const chosen = sellers[announcerTurn % sellers.length];
+      announcerTurn += 1;
+      return chosen;
+    }
+
+    async refreshVoiceCatalog() {
+      try {
+        const res = await fetch('/api/tts/voices');
+        if (res.ok) setVoiceCatalog(await res.json());
+      } catch (_) {}
+      this.voiceCatalog = voiceCatalog;
+      return this.voiceCatalog;
     }
 
     startTicking() {
@@ -308,8 +402,11 @@
       return { item, viewer: '' };
     }
 
-    textFor(item, viewer) {
-      const language = item.language === 'en' || item.language === 'vi' ? item.language : this.settings.language;
+    textFor(item, viewer, languageOverride) {
+      const language =
+        item.language === 'en' || item.language === 'vi'
+          ? item.language
+          : languageOverride || this.settings.language;
       const raw = language === 'vi' ? item.textVi || item.textEn : item.textEn || item.textVi;
       return String(raw || '').replace(/\{viewer\}/gi, viewer ? `@${viewer}` : '');
     }
@@ -330,15 +427,24 @@
 
     speakItem(item, viewer) {
       if (!item || !this.audio) return false;
-      const text = this.textFor(item, viewer);
-      if (!text) return false;
+      const profile = this.resolvedProfile();
       const language = item.language === 'en' || item.language === 'vi' ? item.language : this.settings.language;
-      const voice = item.voice || this.settings.voice || pickVoice(language, this.settings.voiceMode);
+      const profileLanguage = profile ? (profile.language === 'vi' ? 'vi' : 'en') : '';
+      const speechLanguage = profileLanguage || language;
+      const text = this.textFor(item, viewer, speechLanguage);
+      if (!text) return false;
+      const voice =
+        item.voice ||
+        (profile && (profile.resolvedVoice || profile.voice)) ||
+        this.settings.voice ||
+        pickVoice(speechLanguage, this.settings.voiceMode);
       const ok = this.audio.enqueueTts(text, {
         priority: 2,
-        language,
+        language: speechLanguage,
         voice,
-        speed: Number(this.settings.speed) || 1,
+        speed: profile ? Number(profile.speed) || 1 : Number(this.settings.speed) || 1,
+        volume: profile ? profile.volume : this.settings.volume,
+        profile: profile ? profile.id : 'announcer',
         onStart: () => {
           this.lastStartAt = Date.now();
           this.currentText = text;
@@ -389,6 +495,11 @@
         interval: this.settings.interval,
         language: this.settings.language,
         voiceMode: this.settings.voiceMode,
+        voiceProfile: (() => {
+          const profiles = (this.voiceProfiles || voiceProfiles) || null;
+          const announcer = profiles && profiles.profiles && profiles.profiles.announcer;
+          return announcer ? { mode: announcer.mode || profiles.announcerMode, voice: announcer.voice || '' } : null;
+        })(),
         speaking: Boolean(this.currentText),
         currentText: this.currentText,
         lastId: this.lastId,

@@ -16,15 +16,11 @@
 
   const W = 1080;
   const H = 1920;
-  // Hard caps from the viewer character spec.
-  const MAX_CUSTOMERS = 12;
-  const MAX_QUEUE = 5;
-  const VIEWER_LIMITS = { active: 12, visibleWaiting: 5 };
-  const HOLDING_SLOTS = [
-    { x: -150, y: 1470 },
-    { x: W + 150, y: 1470 }
-  ];
-  const HOLDING_SLOT_INDEX = 4; // visible waiting slots are queue slots 0-4
+  // No character or waiting-queue cap: the whole floor is the stage. The first
+  // few queue positions are the counter row; everybody else fills expanding rows
+  // behind them so a large audience stays visible instead of being held off-stage.
+  const FRONT_SLOTS = 8; // 4 counter queue slots + 4 overflow slots
+  const CROWD_AREA = { x0: 110, x1: 970, y0: 1176, y1: 1812 };
   const DRINK_PRICES = {
     lemonade: 5,
     'iced-coffee': 6,
@@ -91,6 +87,31 @@
 
   function depthScale(y) {
     return clamp(0.72 + (y - 1150) * 0.00042, 0.7, 1.08);
+  }
+
+  /** Rows/columns plus a gentle shrink, so 100 viewers fit without stacking up. */
+  function crowdMetrics(count) {
+    const n = Math.max(FRONT_SLOTS, count || 0);
+    const cols = Math.round(clamp(Math.sqrt(n * 1.7), 8, 16));
+    const rows = Math.max(1, Math.ceil(n / cols));
+    return {
+      cols,
+      rows,
+      dx: (CROWD_AREA.x1 - CROWD_AREA.x0) / Math.max(1, cols - 1),
+      dy: clamp((CROWD_AREA.y1 - CROWD_AREA.y0) / Math.max(1, rows - 1), 40, 96),
+      scale: clamp(Math.sqrt(64 / Math.max(16, n)), 0.46, 1)
+    };
+  }
+
+  function crowdSlot(index, metrics = crowdMetrics(0)) {
+    const i = Math.max(0, Math.round(Number(index) || 0));
+    const col = i % metrics.cols;
+    const row = Math.floor(i / metrics.cols);
+    const brick = row % 2 === 0 ? 0 : metrics.dx * 0.5;
+    return {
+      x: clamp(CROWD_AREA.x0 + col * metrics.dx + brick, 54, W - 54),
+      y: clamp(CROWD_AREA.y0 + row * metrics.dy, 1140, 1830)
+    };
   }
 
   function roundedRect(ctx, x, y, w, h, r) {
@@ -266,6 +287,11 @@
       this.lastTs = 0;
       this.tipPops = [];
       this.viewers = new Map();
+      this.departed = new Set();
+      this.crowd = crowdMetrics(0);
+      this.standSeq = 0;
+      this.entranceBurst = 0;
+      this.entranceWindowAt = 0;
       this.effects = [];
       this.orderSeq = 0;
       this.onOrderServed = null;
@@ -364,6 +390,12 @@
       this.pending = [];
       this.tipPops = [];
       this.viewers.clear();
+      this.departed.clear();
+      this.crowd = crowdMetrics(0);
+      this.standSeq = 0;
+      this.entranceBurst = 0;
+      this.entranceWindowAt = 0;
+      this.viewerRoster = null;
       this.effects = [];
       this.orderSeq = 0;
       this.servingId = null;
@@ -383,7 +415,9 @@
         queue: this.queue.length,
         tables: this.tables.reduce((sum, t) => sum + t.occupants.filter(Boolean).length, 0),
         seats: this.tables.length * 2,
-        paused: this.settings.paused
+        paused: this.settings.paused,
+        characters: this.customers.length,
+        viewerCharacters: this.viewers.size
       };
     }
 
@@ -410,11 +444,7 @@
         const existing = this.viewers.get(opts.viewerId);
         if (existing && !existing.gone) return existing;
       }
-      if (this.customers.length >= MAX_CUSTOMERS) return null;
       if (!this.sprites.customers.length || !this.sprites.drinks.length) return null;
-      // Ambient walk-ins wait for room; viewers always get their character
-      // (extra ones wait off stage in the virtual queue).
-      if (!opts.priority && !opts.viewerId && this.queue.length >= MAX_QUEUE) return null;
 
       const record = opts.record || this.findCustomerSprite(opts.gender);
       const drink = opts.drinkRecord || this.findDrinkSprite(opts.drink);
@@ -456,6 +486,9 @@
         table: null,
         seat: null,
         walkPhase: Math.random() * Math.PI * 2,
+        entranceAt: this.time + this.nextEntranceDelay(),
+        standSlot: null,
+        leaveAt: 0,
         gone: false
       };
 
@@ -464,6 +497,16 @@
       else this.queue.push(customer.id);
       if (customer.viewerId) this.viewers.set(customer.viewerId, customer);
       return customer;
+    }
+
+    /** Burst arrivals walk in one after another instead of popping in together. */
+    nextEntranceDelay() {
+      if (!this.entranceWindowAt || this.time - this.entranceWindowAt > 1.6) {
+        this.entranceWindowAt = this.time;
+        this.entranceBurst = 0;
+      }
+      this.entranceBurst += 1;
+      return Math.min(2.6, this.entranceBurst * 0.11 + Math.random() * 0.08);
     }
 
     spawnRush(count) {
@@ -526,6 +569,8 @@
     ensureViewerCharacter(ev) {
       const viewerId = ev.viewerId;
       if (!viewerId) return null;
+      // A fresh interaction from this viewer means they are back on stage.
+      this.departed.delete(String(viewerId));
       const existing = this.findViewerCharacter(viewerId);
       if (existing) {
         if (existing.leaving) this.cancelViewerLeave(existing);
@@ -535,7 +580,6 @@
         if (Number.isFinite(ev.vipLevel)) existing.vipLevel = Number(ev.vipLevel);
         return existing;
       }
-      if (this.customers.length >= MAX_CUSTOMERS) return null;
       const record = this.spriteForIndex(Number.isInteger(ev.sprite) ? ev.sprite : null);
       if (!record) return null;
       const character = this.spawn({
@@ -585,23 +629,50 @@
       if (character.orders.length > 20) character.orders.splice(0, character.orders.length - 20);
     }
 
-    startViewerLeave(character) {
-      if (!character) return;
-      character.leaving = true;
-      character.leaveAfterServe = character.state === 'order';
-      if (character.leaveAfterServe) return; // finish the serving animation first
-      this.finishViewerLeave(character);
-    }
-
-    finishViewerLeave(character) {
-      character.leaving = true;
-      character.leaveAfterServe = false;
-      this.queue = this.queue.filter((id) => id !== character.id);
+    releaseSeat(character) {
       if (character.table && character.seat) {
         character.table.occupants[character.seat.index] = null;
       }
       character.table = null;
       character.seat = null;
+    }
+
+    forgetViewerCharacter(character) {
+      const key = character.viewerId != null ? String(character.viewerId) : '';
+      if (key && this.viewers.get(key) === character) this.viewers.delete(key);
+      if (this.servingId === character.id) this.servingId = null;
+    }
+
+    startViewerLeave(character) {
+      if (!character || character.gone) return;
+      // Repeated departures for the same body are ignored instead of restarting.
+      if (character.leaving && character.state === 'leave') return;
+      // Left while still walking in: the body never reaches the stage.
+      if (this.time < (character.entranceAt || 0)) {
+        character.gone = true;
+        this.queue = this.queue.filter((id) => id !== character.id);
+        this.releaseSeat(character);
+        this.forgetViewerCharacter(character);
+        return;
+      }
+      if (character.state === 'order') {
+        // Finish the drink already on the counter, then wave goodbye and walk out.
+        character.leaving = true;
+        character.leaveAfterServe = true;
+        character.bubble = { text: 'Thanks! See you next live! 👋', timer: 2200 };
+        return;
+      }
+      character.leaving = true;
+      character.leaveAfterServe = false;
+      this.finishViewerLeave(character);
+    }
+
+    finishViewerLeave(character) {
+      if (!character || character.gone) return;
+      character.leaving = true;
+      character.leaveAfterServe = false;
+      this.queue = this.queue.filter((id) => id !== character.id);
+      this.releaseSeat(character);
       character.bubble = { text: 'Thanks! See you next live! 👋', timer: 2600 };
       character.wave = Math.max(character.wave || 0, 2.4);
       character.waypoints = [
@@ -609,15 +680,20 @@
         this.exitFor(character)
       ];
       character.state = 'leave';
+      character.leaveAt = this.time;
       character.cupInHand = false;
-      this.heartsAround(character, 4);
+      this.heartsAround(character, 2);
     }
 
     cancelViewerLeave(character) {
       character.leaving = false;
       character.leaveAfterServe = false;
+      character.leaveAt = 0;
+      character.wave = 0;
       character.bubble = { text: 'Back again!', timer: 1600 };
-      if (character.table) {
+      // Interrupted mid-service or while seated: stay exactly where they are.
+      if (character.state === 'order' || character.state === 'toSeat' || character.state === 'seated') return;
+      if (character.seat) {
         character.state = 'seated';
         character.waypoints = [];
         return;
@@ -625,6 +701,65 @@
       if (!this.queue.includes(character.id)) this.queue.push(character.id);
       character.state = 'queue';
       character.waypoints = [];
+    }
+
+    /** Departures arrive by viewerId, uniqueId or name; resolve the same body. */
+    handleViewerLeave(ev) {
+      const viewerId = ev.viewerId != null ? String(ev.viewerId) : '';
+      if (viewerId) this.departed.add(viewerId);
+      let character = viewerId ? this.findViewerCharacter(ev.viewerId) : null;
+      if (!character) character = this.findCharacterByViewer(ev);
+      if (!character) return; // no body was on stage: never spawn one to say goodbye
+      if (character.viewerId != null) this.departed.add(String(character.viewerId));
+      this.startViewerLeave(character);
+    }
+
+    findCharacterByViewer(ev) {
+      const uniqueId = String(ev.uniqueId || '').toLowerCase();
+      const name = String(ev.user || '').toLowerCase();
+      for (const character of this.customers) {
+        if (character.gone) continue;
+        if (uniqueId && String(character.uniqueId || '').toLowerCase() === uniqueId) return character;
+        if (name && String(character.name || '').toLowerCase() === name) return character;
+      }
+      return null;
+    }
+
+    queueSlotFor(index) {
+      if (index < LAYOUT.queueSlots.length) return LAYOUT.queueSlots[index];
+      const overflowIndex = index - LAYOUT.queueSlots.length;
+      if (overflowIndex < LAYOUT.overflow.length) return LAYOUT.overflow[overflowIndex];
+      return crowdSlot(overflowIndex - LAYOUT.overflow.length, this.crowd);
+    }
+
+    standSpotFor(customer) {
+      if (!customer.standSlot) customer.standSlot = ++this.standSeq;
+      return crowdSlot(this.queue.length + customer.standSlot + FRONT_SLOTS, this.crowd);
+    }
+
+    isFrontRow(customer) {
+      if (customer.state === 'order' || customer.state === 'toSeat' || customer.state === 'seated') return true;
+      if (customer.state !== 'queue') return false;
+      const index = this.queue.indexOf(customer.id);
+      return index !== -1 && index < FRONT_SLOTS;
+    }
+
+    updateLeavers(dt) {
+      let dropped = false;
+      for (const customer of this.customers) {
+        if (customer.gone) continue;
+        if (customer.state === 'leave' || customer.state === 'toGo') {
+          if (!customer.leaveAt) customer.leaveAt = this.time;
+          if (this.advancePath(customer, dt) || this.time - customer.leaveAt > 12) customer.gone = true;
+        }
+      }
+      for (const customer of this.customers) if (customer.gone) dropped = true;
+      if (dropped) {
+        this.customers = this.customers.filter((customer) => !customer.gone);
+        for (const [viewerId, character] of this.viewers) {
+          if (character.gone) this.viewers.delete(viewerId);
+        }
+      }
     }
 
     celebrate(character) {
@@ -697,19 +832,23 @@
 
     /** Big donations make the whole shop cheer and wave. */
     cheerAll(intensity = 1) {
-      for (const character of this.customers) {
+      // A packed shop cheers with motion only; particles stay on the front rows.
+      for (let i = 0; i < this.customers.length; i++) {
+        const character = this.customers[i];
         character.wave = Math.max(character.wave || 0, 1.4 + intensity * 0.5);
         character.celebrate = Math.max(character.celebrate || 0, 1.2 + intensity * 0.5);
-        if (character.viewerId) this.heartsAround(character, 2);
+        if (character.viewerId && i < 24) this.heartsAround(character, 2);
       }
     }
 
     handleViewerEvent(ev) {
-      const character = this.ensureViewerCharacter(ev);
-      if (!character) {
-        console.warn('[ShopGame] Character cap reached for', ev.user);
+      // A departure removes a body, it never creates one.
+      if (ev.type === 'viewerLeave') {
+        this.handleViewerLeave(ev);
         return;
       }
+      const character = this.ensureViewerCharacter(ev);
+      if (!character) return;
       if (ev.vip) character.vip = true;
       if (Number.isFinite(ev.vipLevel) && Number(ev.vipLevel) > (character.vipLevel || 0)) {
         character.vipLevel = Number(ev.vipLevel);
@@ -720,14 +859,12 @@
       if (ev.vipUpgraded) this.vipCelebrate(character);
 
       if (ev.type === 'viewerJoin' || ev.type === 'viewerReconnect') {
+        this.departed.delete(String(ev.viewerId));
         character.leaving = false;
         character.leaveAfterServe = false;
+        character.leaveAt = 0;
         character.bubble = { text: ev.type === 'viewerReconnect' ? 'Back again!' : 'Hi everyone!', timer: 1800 };
         this.react(character, '😊', 1.6);
-        return;
-      }
-      if (ev.type === 'viewerLeave') {
-        this.startViewerLeave(character);
         return;
       }
       if (this.settings.paused) return;
@@ -797,8 +934,19 @@
         this.pendingViewerSync = list;
         return;
       }
+      const activeIds = new Set(
+        list.filter((viewer) => viewer && viewer.id != null && !viewer.leftAt).map((viewer) => String(viewer.id))
+      );
+      // The server roster is authoritative: bodies whose viewer is gone walk out.
+      for (const [viewerId, character] of [...this.viewers]) {
+        if (!activeIds.has(String(viewerId)) && !character.leaving) {
+          this.departed.add(String(viewerId));
+          this.startViewerLeave(character);
+        }
+      }
       for (const viewer of list) {
         if (!viewer || viewer.id == null || viewer.leftAt) continue;
+        this.departed.delete(String(viewer.id));
         let character = this.findViewerCharacter(viewer.id);
         if (!character) {
           character = this.ensureViewerCharacter({
@@ -837,7 +985,8 @@
       // Art is still decoding: replay the interaction once sprites exist.
       if (!this.ready) {
         this.pendingEvents.push(ev);
-        if (this.pendingEvents.length > 40) this.pendingEvents.shift();
+        // Keep a whole big-audience burst; the roster sync covers anything older.
+        if (this.pendingEvents.length > 600) this.pendingEvents.shift();
         return;
       }
       if (ev.viewerId) {
@@ -914,7 +1063,9 @@
     advancePath(customer, dt) {
       const wp = customer.waypoints[0];
       if (!wp) return true;
-      const arrived = this.moveToward(customer, wp, customer.speed * dt);
+      // Departing characters hurry out so no body lingers at the shop edge.
+      const step = customer.speed * (customer.state === 'leave' ? 1.5 : 1) * dt;
+      const arrived = this.moveToward(customer, wp, step);
       if (arrived) {
         customer.waypoints.shift();
         return customer.waypoints.length === 0;
@@ -1026,6 +1177,12 @@
         ];
         customer.state = 'toSeat';
         customer.bubble = { text: 'Thanks!', timer: 1200 };
+      } else if (customer.viewerId) {
+        // Audience too big for a table? Enjoy the drink standing in the shop.
+        customer.waypoints = [this.standSpotFor(customer)];
+        customer.state = 'linger';
+        customer.seatedTimer = rand(6000, 11000);
+        customer.bubble = { text: 'Thanks!', timer: 1400 };
       } else {
         customer.waypoints = [
           { x: customer.x < W / 2 ? 420 : 700, y: 1720 },
@@ -1059,7 +1216,11 @@
     }
 
     update(dt) {
-      if (this.settings.paused) return;
+      if (this.settings.paused) {
+        // Pausing must not freeze a goodbye: leavers still walk out and vanish.
+        this.updateLeavers(dt);
+        return;
+      }
 
       this.serveFlash = Math.max(0, this.serveFlash - dt * 1.6);
 
@@ -1090,6 +1251,8 @@
       }
 
       for (const customer of this.customers) {
+        // Staggered entrance: the body exists but is not on stage yet.
+        if (customer.entranceAt && this.time < customer.entranceAt) continue;
         if (customer.bubble) {
           customer.bubble.timer -= dt * 1000;
           if (customer.bubble.timer <= 0) customer.bubble = null;
@@ -1105,7 +1268,9 @@
         const vipLevelNow = customer.vipLevel || 0;
         if (vipLevelNow > 0) {
           customer.sparkleTimer = (customer.sparkleTimer || 0) + dt;
-          const sparkleGap = vipLevelNow >= 3 ? 0.34 : vipLevelNow === 2 ? 0.6 : 1.2;
+          // Packed shops sparkle less often so particles cannot flood the frame.
+          const crowded = this.customers.length > 40 ? 3 : 1;
+          const sparkleGap = (vipLevelNow >= 3 ? 0.34 : vipLevelNow === 2 ? 0.6 : 1.2) * crowded;
           if (customer.sparkleTimer >= sparkleGap && this.effects.length < 90) {
             customer.sparkleTimer = 0;
             this.goldSparkles(customer, 1);
@@ -1124,16 +1289,8 @@
               customer.state = 'leave';
               break;
             }
-            let slot;
-            if (index < VIEWER_LIMITS.visibleWaiting) {
-              slot =
-                index < LAYOUT.queueSlots.length
-                  ? LAYOUT.queueSlots[index]
-                  : LAYOUT.overflow[Math.min(index - LAYOUT.queueSlots.length, LAYOUT.overflow.length - 1)];
-            } else {
-              // Virtual waiting queue: no room at the counter, wait off stage.
-              slot = HOLDING_SLOTS[index % HOLDING_SLOTS.length];
-            }
+            // Every waiting viewer gets a real standing spot, in expanding rows.
+            const slot = this.queueSlotFor(index);
             const arrived = this.moveToward(customer, slot, customer.speed * dt);
             if (index === 0 && arrived && !this.servingId) this.beginOrder(customer);
             break;
@@ -1156,9 +1313,22 @@
             if (customer.seatedTimer <= 0) this.finishDrink(customer);
             break;
           }
+          case 'linger': {
+            if (customer.waypoints.length) {
+              this.advancePath(customer, dt);
+              break;
+            }
+            customer.seatedTimer -= dt * 1000;
+            if (customer.seatedTimer <= 0) {
+              customer.seatedTimer = rand(6000, 11000);
+              if (Math.random() < 0.25) customer.wave = Math.max(customer.wave || 0, 1);
+            }
+            break;
+          }
           case 'toGo':
           case 'leave': {
-            if (this.advancePath(customer, dt)) customer.gone = true;
+            if (!customer.leaveAt) customer.leaveAt = this.time;
+            if (this.advancePath(customer, dt) || this.time - customer.leaveAt > 12) customer.gone = true;
             break;
           }
           default:
@@ -1169,25 +1339,23 @@
       this.separateWalkers();
       this.customers = this.customers.filter((c) => !c.gone);
 
-      // Someone joined while the floor was full (usually leaving characters):
-      // retry once a slot opens so no viewer is lost.
+      // Every active viewer must own exactly one body; retry any that are missing.
       this.viewerSyncTimer += dt;
       if (this.viewerRoster && this.viewerSyncTimer > 2) {
         this.viewerSyncTimer = 0;
         const waiting = this.viewerRoster.filter((viewer) => viewer && !viewer.leftAt);
-        if (this.viewers.size < waiting.length && this.customers.length < MAX_CUSTOMERS) {
-          this.syncViewers(this.viewerRoster);
-        }
+        if (this.viewers.size < waiting.length) this.syncViewers(this.viewerRoster);
       }
       for (const [viewerId, character] of this.viewers) {
         if (character.gone) this.viewers.delete(viewerId);
       }
+      this.crowd = crowdMetrics(this.customers.length);
     }
 
     separateWalkers() {
-      const walkers = this.customers.filter(
-        (c) => c.state === 'enter' || c.state === 'toSeat' || c.state === 'leave' || c.state === 'toGo'
-      );
+      const walkers = this.customers
+        .filter((c) => c.state === 'enter' || c.state === 'toSeat' || c.state === 'leave' || c.state === 'toGo')
+        .slice(0, 48);
       for (let i = 0; i < walkers.length; i++) {
         for (let j = i + 1; j < walkers.length; j++) {
           const a = walkers[i];
@@ -1213,7 +1381,8 @@
     }
 
     customerScale(customer) {
-      return depthScale(customer.y) * (customer.heightFactor || 1);
+      const crowd = this.isFrontRow(customer) ? 1 : this.crowd.scale;
+      return depthScale(customer.y) * (customer.heightFactor || 1) * crowd;
     }
 
     // ------------------------------------------------------------------ render
@@ -1242,6 +1411,7 @@
         drawables.push({ y: table.y, draw: () => this.drawTable(ctx, table) });
       }
       for (const customer of this.customers) {
+        if (customer.entranceAt && this.time < customer.entranceAt) continue;
         const seated = customer.state === 'seated' && customer.table;
         drawables.push({
           y: seated ? customer.table.y - 2 : customer.y,
@@ -1594,7 +1764,11 @@
         ctx.fillText('👋', customer.x + 34 * scale, feetY - height - 58 * scale);
         ctx.restore();
       }
-      if (customer.name) {
+      // Deep rows keep their sprite but drop the tag; names stay readable up front.
+      const showName =
+        customer.name &&
+        (this.isFrontRow(customer) || vipLevel > 0 || clamp(scale, 0, 1.2) >= 0.6);
+      if (showName) {
         this.drawNameTag(ctx, customer, feetY - height - (vipLevel >= 2 ? 38 : customer.vip ? 34 : 12), scale);
       }
       if (customer.bubble) this.drawBubble(ctx, customer.x, feetY - height - 6, customer.bubble, scale);
@@ -1648,7 +1822,7 @@
 
     drawNameTag(ctx, customer, y, scale) {
       ctx.save();
-      ctx.font = `800 ${Math.round(19 * clamp(scale, 0.8, 1.1))}px "Nunito", sans-serif`;
+      ctx.font = `800 ${Math.round(19 * clamp(scale, 0.58, 1.06))}px "Nunito", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const pending = customer.orders ? customer.orders.length : 0;
@@ -1657,7 +1831,7 @@
         : customer.gift
           ? `${customer.name} · ${customer.gift.name}`
           : customer.name;
-      const text = ellipsize(ctx, label, 210);
+      const text = ellipsize(ctx, label, customer.vipLevel ? 210 : 168);
       const tagH = 32;
       const tagW = Math.max(64, ctx.measureText(text).width + 26);
       const tagX = clamp(customer.x - tagW / 2, 10, W - tagW - 10);

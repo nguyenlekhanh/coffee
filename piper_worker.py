@@ -46,8 +46,10 @@ def emit(payload: dict) -> None:
 
 
 def pretty_name(stem: str) -> str:
-    name = re.sub(r"^(en_US|en_GB|vi_VN)-", "", stem, flags=re.IGNORECASE)
-    name = re.sub(r"\b(medium|low|high|x_low|vais1000)\b", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"^piper[-_]", "", stem, flags=re.IGNORECASE)
+    name = re.sub(r"^(en|vi)[-_][A-Za-z]{2}[-_]", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"^(en|vi)[-_]", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"\b(medium|low|high|x_low|x-low)\b", "", name, flags=re.IGNORECASE)
     name = name.replace("_", " ").replace("-", " ").strip()
     if not name:
         return stem
@@ -197,7 +199,7 @@ def main() -> None:
             req = json.loads(line)
             req_id = req.get("id")
             if req.get("cmd") == "voices":
-                emit({"type": "voices", "voices": discover_voices()})
+                emit({"type": "voices", "id": req_id, "voices": discover_voices()})
                 continue
             if req.get("cmd") == "warm":
                 voice = find_voice(req.get("voice") or "", req.get("language") or "en")

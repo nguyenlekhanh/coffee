@@ -78,6 +78,7 @@
   game.onOrderServed = (info) => {
     if (!info || !info.viewerId) return;
     callRpc('shop.viewerServed', {
+      viewerId: info.viewerId,
       user: info.name,
       uniqueId: info.uniqueId,
       orderId: info.orderId,
@@ -421,6 +422,8 @@
       if (typeof st.settings.ttsVoice === 'string' && st.settings.ttsVoice) audio.ttsVoice = st.settings.ttsVoice;
       if (typeof st.settings.ttsSpeed === 'number') audio.ttsSpeed = st.settings.ttsSpeed;
       // Announcements stop with the shop, and never talk over a paused game.
+      if (announcer && st.tts) announcer.setVoiceCatalog(st.tts.catalog || st.tts.voices);
+      if (announcer && st.voiceProfiles) announcer.setVoiceProfiles(st.voiceProfiles);
       if (announcer) announcer.setPaused(Boolean(st.settings.paused) || st.settings.running === false);
       const ttsBtn = $('btnToggleTts');
       if (ttsBtn) {
@@ -588,10 +591,14 @@
     }
 
     if (ev.ttsText) {
+      // The profile snapshot was resolved on the server when the event was
+      // created, so later profile edits cannot change this queued line.
       audio.enqueueTts(ev.ttsText, {
         voice: ev.ttsVoice,
         language: ev.ttsLanguage,
         speed: ev.ttsSpeed,
+        volume: ev.ttsVolume,
+        profile: ev.ttsProfile,
         priority: ev.type === 'giftOrder' || ev.type === 'partyOrder' ? 0 : 1
       });
     }
@@ -652,6 +659,8 @@
             voice: msg.params.voice,
             language: msg.params.language,
             speed: msg.params.speed,
+            volume: msg.params.volume,
+            profile: msg.params.profile,
             url: msg.params.url,
             priority: 0
           });

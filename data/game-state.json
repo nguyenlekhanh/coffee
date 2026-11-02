@@ -1,13 +1,61 @@
 {
-  "customersServed": 9,
-  "drinksSold": 9,
-  "totalTips": 32.75,
-  "likes": 1,
-  "follows": 1,
-  "comments": 1,
-  "gifts": 2,
-  "totalCoins": 25,
+  "customersServed": 19,
+  "drinksSold": 19,
+  "totalTips": 80.75,
+  "likes": 9,
+  "follows": 2,
+  "comments": 2,
+  "gifts": 6,
+  "totalCoins": 85,
   "recentGifts": [
+    {
+      "id": "gift_1793638358328_drua",
+      "user": "Route Test",
+      "uniqueId": "Route Test",
+      "avatar": "",
+      "giftId": "coin_20",
+      "giftName": "20-coin gift",
+      "giftIcon": "/assets/gift_icon/flowergarland15.webp",
+      "giftCoins": 20,
+      "coins": 20,
+      "units": 1,
+      "drinkId": "iced-coffee",
+      "drinkName": "Iced Coffee",
+      "drinkImage": "/assets/drinks/Iced_Coffee.jpg",
+      "at": "2026-11-02T16:52:38.328Z"
+    },
+    {
+      "id": "gift_1793638356294_nrrs",
+      "user": "Route Test",
+      "uniqueId": "Route Test",
+      "avatar": "",
+      "giftId": "coin_20",
+      "giftName": "20-coin gift",
+      "giftIcon": "/assets/gift_icon/flowergarland15.webp",
+      "giftCoins": 20,
+      "coins": 20,
+      "units": 1,
+      "drinkId": "iced-coffee",
+      "drinkName": "Iced Coffee",
+      "drinkImage": "/assets/drinks/Iced_Coffee.jpg",
+      "at": "2026-11-02T16:52:36.294Z"
+    },
+    {
+      "id": "gift_1793638271053_mz55",
+      "user": "Route Test",
+      "uniqueId": "Route Test",
+      "avatar": "",
+      "giftId": "coin_20",
+      "giftName": "20-coin gift",
+      "giftIcon": "/assets/gift_icon/flowergarland15.webp",
+      "giftCoins": 20,
+      "coins": 20,
+      "units": 1,
+      "drinkId": "iced-coffee",
+      "drinkName": "Iced Coffee",
+      "drinkImage": "/assets/drinks/Iced_Coffee.jpg",
+      "at": "2026-11-02T16:51:11.053Z"
+    },
     {
       "id": "gift_1793603350799_44ek",
       "user": "Smoke",
@@ -35,6 +83,66 @@
       "drinks": 9,
       "gifts": 2,
       "lastNote": "Gift: Drink Party Tray"
+    },
+    "Compat Guest": {
+      "name": "Compat Guest",
+      "uniqueId": "Compat Guest",
+      "avatar": "",
+      "tips": 0.5,
+      "coins": 0,
+      "drinks": 0,
+      "gifts": 0,
+      "lastNote": "Sent some love to the shop"
+    },
+    "Compat r2": {
+      "name": "Compat r2",
+      "uniqueId": "Compat r2",
+      "avatar": "",
+      "tips": 0.5,
+      "coins": 0,
+      "drinks": 0,
+      "gifts": 0,
+      "lastNote": "Sent some love to the shop"
+    },
+    "Compat r3": {
+      "name": "Compat r3",
+      "uniqueId": "Compat r3",
+      "avatar": "",
+      "tips": 0.5,
+      "coins": 0,
+      "drinks": 0,
+      "gifts": 0,
+      "lastNote": "Sent some love to the shop"
+    },
+    "Compat r4": {
+      "name": "Compat r4",
+      "uniqueId": "Compat r4",
+      "avatar": "",
+      "tips": 0.5,
+      "coins": 0,
+      "drinks": 0,
+      "gifts": 0,
+      "lastNote": "Sent some love to the shop"
+    },
+    "test.retain": {
+      "name": "Queue Retention",
+      "uniqueId": "test.retain",
+      "avatar": "",
+      "tips": 6,
+      "coins": 0,
+      "drinks": 1,
+      "gifts": 0,
+      "lastNote": "One lemonade please"
+    },
+    "Route Test": {
+      "name": "Route Test",
+      "uniqueId": "Route Test",
+      "avatar": "",
+      "tips": 40,
+      "coins": 60,
+      "drinks": 9,
+      "gifts": 4,
+      "lastNote": "20 coins"
     }
   },
   "settings": {
@@ -43,7 +151,7 @@
     "spawnRate": 1.2,
     "ttsEnabled": true,
     "ttsLanguage": "en",
-    "ttsVoice": "en_US-amy-medium",
+    "ttsVoice": "en_US-hfc_female-medium",
     "ttsSpeed": 1,
     "ttsMaxChars": 120,
     "bgMusicEnabled": true,
@@ -53,5 +161,40 @@
     "sfxVolume": 0.85,
     "autoSim": false,
     "autoSimIntervalMs": 9000
+  },
+  "voiceProfiles": {
+    "maleSeller": {
+      "id": "maleSeller",
+      "enabled": true,
+      "voice": "en_US-arctic-medium",
+      "language": "en",
+      "speed": 1,
+      "volume": 0.9
+    },
+    "femaleSeller": {
+      "id": "femaleSeller",
+      "enabled": true,
+      "voice": "en_US-amy-medium",
+      "language": "en",
+      "speed": 1.05,
+      "volume": 0.9
+    },
+    "announcer": {
+      "id": "announcer",
+      "enabled": true,
+      "voice": "",
+      "language": "en",
+      "speed": 1,
+      "volume": 0.9,
+      "mode": "alternate"
+    },
+    "customer": {
+      "id": "customer",
+      "enabled": true,
+      "voice": "en_US-hfc_female-medium",
+      "language": "en",
+      "speed": 1,
+      "volume": 0.85
+    }
   }
 }

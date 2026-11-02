@@ -90,7 +90,8 @@
       try {
         localStorage.setItem('shop_tts_vol', String(v));
       } catch (_) {}
-      if (this.currentAudio) this.currentAudio.volume = v;
+      // Volume is captured per speech item when it enters the queue. Changing the
+      // default here must not alter speech that is already playing or waiting.
     }
 
     // ---------------------------------------------------------- ambience loop
@@ -182,7 +183,13 @@
       return {
         playing: this.ttsPlaying,
         current: this.currentAudio ? this.currentAudio.src : '',
-        queued: this.ttsQueue.map((item) => ({ text: item.text, priority: item.priority || 1 }))
+        queued: this.ttsQueue.map((item) => ({
+          text: item.text,
+          priority: item.priority || 1,
+          voice: item.voice,
+          profile: item.profile,
+          volume: item.volume
+        }))
       };
     }
 
@@ -313,6 +320,8 @@
         if (dropped && dropped.onEnd) dropped.onEnd();
       }
 
+      // Voice, speed and volume are frozen here. A later profile edit never
+      // rewrites a line that is already queued or playing.
       const item = {
         id: `tts_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         priority,
@@ -320,6 +329,8 @@
         language: options.language || this.ttsLanguage || 'en',
         voice: options.voice || this.ttsVoice || 'en_US-amy-medium',
         speed: Number(options.speed || this.ttsSpeed || 1),
+        volume: Math.max(0, Math.min(1, Number(options.volume ?? this.ttsVolume ?? 0.9))),
+        profile: options.profile || '',
         url: options.url || null,
         onStart,
         onEnd,
@@ -374,9 +385,11 @@
           if (res && res.ok && res.url) audioUrl = res.url;
         }
         if (audioUrl) {
-          if (this.onTtsStateChange) this.onTtsStateChange({ speaking: true, text: item.text });
+          if (this.onTtsStateChange) {
+            this.onTtsStateChange({ speaking: true, text: item.text, voice: item.voice, profile: item.profile });
+          }
           if (item.onStart) item.onStart();
-          await this.playAudioUrl(audioUrl);
+          await this.playAudioUrl(audioUrl, item.volume);
           if (item.onEnd) item.onEnd();
         } else {
           if (item.onStart) item.onStart();
@@ -394,12 +407,13 @@
       }
     }
 
-    playAudioUrl(url) {
+    playAudioUrl(url, volume) {
       return new Promise((resolve) => {
         try {
           const audio = new Audio(url);
           this.currentAudio = audio;
-          audio.volume = this.ttsVolume;
+          const level = Number(volume);
+          audio.volume = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : this.ttsVolume;
           audio.onended = () => {
             this.currentAudio = null;
             resolve();

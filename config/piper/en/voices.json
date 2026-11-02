@@ -1,6 +1,6 @@
 [
   {
-    "name": "Army",
+    "name": "Amy",
     "gender": "female",
     "audio_path": "piper-en/en_US-amy-medium",
     "description": "US Female"
@@ -13,8 +13,8 @@
   },
   {
     "name": "hfc_female",
-    "gender": "femalemale",
+    "gender": "female",
     "audio_path": "piper-en/en_US-hfc_female-medium.onnx",
     "description": "US Female"
-  },
+  }
 ]

@@ -116,6 +116,41 @@
     }
     .ann-vi { color: var(--ink-soft); font-weight: 600; font-size: 12px; }
     .ann-toggle { padding-top: 2px; }
+    .voice-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; padding-right: 4px; }
+    .voice-item {
+      display: flex; align-items: center; gap: 8px; background: #fff;
+      border: 2px solid rgba(59, 42, 32, 0.3); border-radius: 10px; padding: 6px 9px;
+      font-size: 12.5px; font-weight: 700;
+    }
+    .voice-item.invalid { opacity: 0.55; }
+    .voice-item .btn { flex: 0 0 auto; padding: 4px 8px; font-size: 11.5px; }
+    .voice-name { flex: 0 0 110px; }
+    .voice-gender { flex: 0 0 88px; font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+    .voice-path { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vp-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 1080px) { .vp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .vp-grid { grid-template-columns: 1fr; } }
+    .vp-card {
+      background: #fff; border: 3px solid rgba(59, 42, 32, 0.4); border-radius: 14px;
+      padding: 11px; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+    }
+    .vp-card.disabled { opacity: 0.62; }
+    .vp-card.missing-voice { border-color: var(--coral); }
+    .vp-head { display: flex; align-items: center; gap: 7px; }
+    .vp-head strong { flex: 1; font-family: 'Baloo 2', sans-serif; font-size: 15px; }
+    .vp-head .btn { flex: 0 0 auto; padding: 5px 8px; font-size: 11px; }
+    .vp-icon { font-size: 18px; }
+    .vp-persona { font-size: 11.5px; line-height: 1.3; min-height: 30px; }
+    .vp-card select { font-size: 12.5px; padding: 7px 8px; }
+    .vp-setting { display: flex; flex-direction: column; gap: 3px; }
+    .vp-pitch {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      font-size: 11.5px; color: var(--ink-soft); font-weight: 800;
+    }
+    .vp-test-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .vp-test-row .btn { flex: 0 0 auto; padding: 6px 9px; font-size: 12px; }
+    .vp-hint { font-size: 11px; line-height: 1.3; color: var(--ink-soft); font-weight: 600; }
+    .vp-meta { font-size: 10.5px; letter-spacing: 0.2px; color: var(--ink-soft); font-weight: 700; text-align: right; }
     .tt-state {
       display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.8px;
       padding: 4px 10px; border-radius: 8px; background: rgba(59, 42, 32, 0.12); color: var(--ink-soft);
@@ -214,6 +249,12 @@
             <button class="btn on" id="btnTtsToggle">Voice: ON</button>
           </div>
         </div>
+        <div class="row">
+          <button class="btn" id="btnRefreshVoices">🔄 Refresh Piper Voices</button>
+          <span class="hint" id="voiceSummary" style="flex: 1 1 240px; align-self: center">Scanning config/piper…</span>
+        </div>
+        <div class="hint" id="voiceDetail">Select a voice to see its model file, gender and status.</div>
+        <div class="voice-list" id="voiceList"></div>
         <div>
           <div class="label-line"><span>Speech speed</span><strong id="valSpeed">1.00×</strong></div>
           <input type="range" id="sliderSpeed" min="50" max="200" step="5" value="100" />
@@ -228,6 +269,22 @@
         </div>
         <audio id="audioPreview" controls style="width: 100%; height: 38px;"></audio>
         <div class="hint" id="ttsHint">Piper runs locally from config/piper — no models are downloaded.</div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>🎭 VOICE CHARACTER PROFILES</h2>
+        <div class="row">
+          <div style="flex: 2 1 320px">
+            <div class="label-line"><span>Voice preview text</span></div>
+            <input type="text" id="vpPreviewText" value="Welcome to Sunny Side Sips! Fresh drinks, sunny vibes, all day long." />
+          </div>
+          <button class="btn" id="btnVoiceProfilesRefresh" style="align-self: flex-end">🔄 Rescan voices</button>
+          <button class="btn danger" id="btnVoiceProfilesReset" style="align-self: flex-end">↺ Restore Default Settings</button>
+        </div>
+        <div class="hint" id="vpStatus">Loading voice profiles…</div>
+        <div class="vp-grid" id="vpGrid"></div>
+        <audio id="vpAudio" controls style="width: 100%; height: 38px;"></audio>
+        <div class="hint" id="vpPitchNote">Pitch is not supported by the installed Piper engine.</div>
       </section>
 
       <section class="card" style="grid-column: 1 / -1">
@@ -331,6 +388,12 @@
               <option value="random">Random seller</option>
             </select>
           </div>
+          <div>
+            <div class="label-line"><span>Exact voice</span></div>
+            <select id="annVoice">
+              <option value="">Auto (by seller gender)</option>
+            </select>
+          </div>
         </div>
         <div class="row">
           <div>
@@ -347,6 +410,7 @@
           </div>
         </div>
         <div class="hint" id="annStatus">Waiting for the live stage…</div>
+        <div class="hint" id="annProfileNote">Voice, language, speed and volume come from the 🎭 Voice Character Profiles section.</div>
 
         <div class="label-line"><span>Announcement manager</span><strong id="annCount">0</strong></div>
         <div class="row">
@@ -502,30 +566,211 @@
     };
 
     let ttsVoices = [];
+    let ttsCatalog = { en: [], vi: [], vn: [] };
+    let lastVoiceSignature = '';
+    let voiceHintUntil = 0;
     let ttsEnabled = true;
+
+    function genderLabel(gender) {
+      if (gender === 'female') return '♀ Female';
+      if (gender === 'male') return '♂ Male';
+      return '—';
+    }
+
+    function voiceOptionLabel(voice) {
+      const gender = voice.gender ? ' · ' + (voice.gender === 'female' ? 'Female' : 'Male') : '';
+      const unavailable = voice.valid === false ? ' · unavailable' : '';
+      return `${voice.name}${gender}${unavailable}`;
+    }
+
+    function voiceFor(id) {
+      return ttsVoices.find((voice) => voice.id === id) || null;
+    }
 
     function renderVoiceOptions() {
       const language = document.getElementById('ttsLanguage').value;
       const select = document.getElementById('ttsVoice');
-      const current = select.value;
+      const previous = select.value;
       const list = ttsVoices.filter((voice) => voice.language === language);
       select.innerHTML = list.length
-        ? list.map((voice) => `<option value="${voice.id}">${escapeHtml(voice.name)}</option>`).join('')
+        ? list
+            .map(
+              (voice) =>
+                `<option value="${escapeHtml(voice.id)}"${voice.valid === false ? ' disabled' : ''}>${escapeHtml(voiceOptionLabel(voice))}</option>`
+            )
+            .join('')
         : '<option value="">No model in config/piper</option>';
-      if (list.some((voice) => voice.id === current)) select.value = current;
+      const wanted = [previous, select.dataset.setting, list[0] && list[0].id].find(
+        (id) => id && list.some((voice) => voice.id === id && voice.valid !== false)
+      );
+      if (wanted) select.value = wanted;
+      renderVoiceDetail();
     }
+
+    function renderVoiceDetail() {
+      const select = document.getElementById('ttsVoice');
+      const voice = voiceFor(select.value);
+      const detail = document.getElementById('voiceDetail');
+      if (!detail) return;
+      detail.textContent = voice
+        ? `${voice.name} · ${genderLabel(voice.gender)} · ` +
+          (voice.valid === false
+            ? 'UNAVAILABLE: ' + (voice.problem || 'cannot load')
+            : voice.path || 'model inside config/piper')
+        : 'No Piper model found for this language.';
+    }
+
+    function renderVoiceList() {
+      const wrap = document.getElementById('voiceList');
+      if (!wrap) return;
+      const language = document.getElementById('ttsLanguage').value;
+      const list = ttsVoices.filter((voice) => voice.language === language);
+      wrap.innerHTML = list.length
+        ? list
+            .map(
+              (voice) => `
+          <div class="voice-item${voice.valid === false ? ' invalid' : ''}">
+            <span class="voice-name">${escapeHtml(voice.name)}</span>
+            <span class="voice-gender">${escapeHtml(genderLabel(voice.gender))}</span>
+            <span class="voice-path" title="${escapeHtml(voice.path || '')}">${escapeHtml(voice.path || '—')}</span>
+            <button class="btn" data-voice-test="${escapeHtml(voice.id)}" ${voice.valid === false ? 'disabled' : ''}>▶ Test</button>
+          </div>`
+            )
+            .join('')
+        : '<div class="hint">No voice models for this language yet.</div>';
+      wrap.querySelectorAll('[data-voice-test]').forEach((btn) => {
+        btn.onclick = () => speakWithVoice(btn.getAttribute('data-voice-test'));
+      });
+    }
+
+    function renderVoiceSummary(status) {
+      const summary = document.getElementById('voiceSummary');
+      if (!summary) return;
+      const en = ttsVoices.filter((voice) => voice.language === 'en').length;
+      const vi = ttsVoices.filter((voice) => voice.language === 'vi').length;
+      const invalid = ttsVoices.filter((voice) => voice.valid === false).length;
+      const scanned = status && status.lastScanAt ? new Date(status.lastScanAt).toLocaleTimeString() : '—';
+      summary.textContent =
+        `${ttsVoices.length} discovered · English ${en} · Vietnamese ${vi}` +
+        (invalid ? ` · ${invalid} unavailable` : '') +
+        ` · scanned ${scanned}`;
+    }
+
+    function applyVoiceCatalog(catalog) {
+      if (!catalog) return;
+      ttsCatalog = catalog;
+      const merged = [];
+      const seen = new Set();
+      for (const voice of [...(catalog.en || []), ...(catalog.vi || catalog.vn || [])]) {
+        if (!voice || !voice.id || seen.has(voice.id)) continue;
+        seen.add(voice.id);
+        merged.push(voice);
+      }
+      if (merged.length) ttsVoices = merged;
+      renderVoiceOptions();
+      renderVoiceList();
+      renderVoiceSummary(catalog);
+      populateAnnVoiceOptions();
+    }
+
+    function syncVoiceData(tts) {
+      if (!tts) return;
+      const voices = Array.isArray(tts.voices) ? tts.voices : [];
+      const signature = voices
+        .map((voice) => `${voice.id}:${voice.gender || ''}:${voice.valid === false ? 0 : 1}`)
+        .join('|');
+      if (signature && signature !== lastVoiceSignature) {
+        lastVoiceSignature = signature;
+        ttsVoices = voices.map((voice) => ({ ...voice }));
+        renderVoiceOptions();
+        renderVoiceList();
+        populateAnnVoiceOptions();
+      }
+      if (tts.catalog) {
+        ttsCatalog = tts.catalog;
+        renderVoiceSummary(tts.catalog);
+      } else {
+        renderVoiceSummary(tts);
+      }
+    }
+
+    async function speakWithVoice(voiceId) {
+      const voice = voiceFor(voiceId);
+      if (!voice) return;
+      const hint = document.getElementById('ttsHint');
+      if (voice.valid === false) {
+        hint.textContent = `${voice.name} cannot load: ${voice.problem || 'unknown error'}`;
+        voiceHintUntil = Date.now() + 8000;
+        return;
+      }
+      document.getElementById('ttsVoice').value = voice.id;
+      document.getElementById('ttsLanguage').value = voice.language;
+      renderVoiceDetail();
+      renderVoiceList();
+      const text = document.getElementById('ttsText').value.trim() || 'Welcome to Sunny Side Sips!';
+      const speed = Number(document.getElementById('sliderSpeed').value) / 100;
+      hint.textContent = `Synthesizing ${voice.name} from ${voice.path || 'config/piper'}…`;
+      voiceHintUntil = Date.now() + 20000;
+      const data = await sendRpc('temple.speak', {
+        text,
+        language: voice.language,
+        voice: voice.id,
+        speed,
+        broadcast: true
+      });
+      const result = data && data.result;
+      if (result && result.ok && result.url) {
+        const player = document.getElementById('audioPreview');
+        player.src = result.url;
+        player.play().catch(() => {});
+        hint.textContent =
+          `Spoken with ${result.voice} (${result.language})` +
+          (result.cached ? ' · cached' : ` · ${result.synthSec}s`) +
+          ` · ${voice.path}`;
+      } else {
+        hint.textContent =
+          'Voice failed: ' +
+          ((result && result.error) || (data && data.error && data.error.message) || 'unknown error');
+      }
+      voiceHintUntil = Date.now() + 12000;
+    }
+
+    document.getElementById('btnRefreshVoices').onclick = async () => {
+      const btn = document.getElementById('btnRefreshVoices');
+      const hint = document.getElementById('ttsHint');
+      btn.disabled = true;
+      hint.textContent = 'Scanning config/piper for new .onnx models…';
+      voiceHintUntil = Date.now() + 6000;
+      const data = await sendRpc('tts.refreshVoices');
+      btn.disabled = false;
+      const catalog = data && data.result;
+      if (catalog && Array.isArray(catalog.en)) {
+        lastVoiceSignature = '';
+        applyVoiceCatalog(catalog);
+        hint.textContent =
+          `Piper voices refreshed · ${catalog.valid}/${catalog.total} playable` +
+          ` · English ${catalog.en.length} · Vietnamese ${catalog.vi.length}`;
+      } else {
+        hint.textContent =
+          'Voice refresh failed: ' + ((data && data.error && data.error.message) || 'unknown error');
+      }
+      voiceHintUntil = Date.now() + 10000;
+    };
 
     document.getElementById('ttsLanguage').onchange = async (e) => {
       const language = e.target.value;
-      const list = ttsVoices.filter((voice) => voice.language === language);
+      const list = ttsVoices.filter((voice) => voice.language === language && voice.valid !== false);
       await sendRpc('temple.updateSettings', {
         ttsLanguage: language,
         ttsVoice: list[0] ? list[0].id : undefined
       });
       renderVoiceOptions();
+      renderVoiceList();
     };
-    document.getElementById('ttsVoice').onchange = (e) =>
+    document.getElementById('ttsVoice').onchange = (e) => {
+      renderVoiceDetail();
       sendRpc('temple.updateSettings', { ttsVoice: e.target.value });
+    };
 
     document.getElementById('btnTtsToggle').onclick = (e) => {
       ttsEnabled = !ttsEnabled;
@@ -547,24 +792,8 @@
     voiceVolSlider.onchange = (e) =>
       sendRpc('temple.updateSettings', { ttsVolume: Number(e.target.value) / 100 });
 
-    document.getElementById('btnSpeak').onclick = async () => {
-      const text = document.getElementById('ttsText').value.trim();
-      const language = document.getElementById('ttsLanguage').value;
-      const voice = document.getElementById('ttsVoice').value;
-      const speed = Number(document.getElementById('sliderSpeed').value) / 100;
-      const hint = document.getElementById('ttsHint');
-      hint.textContent = 'Synthesizing with Piper…';
-      const data = await sendRpc('temple.speak', { text, language, voice, speed, broadcast: true });
-      if (data && data.result && data.result.url) {
-        const player = document.getElementById('audioPreview');
-        player.src = data.result.url;
-        player.play().catch(() => {});
-        hint.textContent = `Spoken with ${data.result.voice} (${data.result.language}) in ${data.result.synthSec}s`;
-      } else {
-        hint.textContent =
-          'Voice engine unavailable: ' + ((data && data.result && data.result.error) || 'unknown error');
-      }
-    };
+    document.getElementById('btnSpeak').onclick = () =>
+      speakWithVoice(document.getElementById('ttsVoice').value);
 
     document.getElementById('btnSendRpc').onclick = async () => {
       const method = document.getElementById('rpcMethod').value.trim();
@@ -677,10 +906,14 @@
         renderTikTokStatus(st);
 
         if (st.tts) {
-          ttsVoices = Array.isArray(st.tts.voices) ? st.tts.voices : [];
           document.getElementById('ttsLanguage').value = st.settings.ttsLanguage || 'en';
+          const voiceSelect = document.getElementById('ttsVoice');
+          voiceSelect.dataset.setting = st.settings.ttsVoice || '';
+          syncVoiceData(st.tts);
+          renderVoiceProfiles(st.voiceProfiles);
           renderVoiceOptions();
-          if (st.settings.ttsVoice) document.getElementById('ttsVoice').value = st.settings.ttsVoice;
+          if (st.settings.ttsVoice) voiceSelect.value = st.settings.ttsVoice;
+          renderVoiceDetail();
           document.getElementById('sliderSpeed').value = String(Math.round((st.settings.ttsSpeed || 1) * 100));
           document.getElementById('valSpeed').textContent = Number(st.settings.ttsSpeed || 1).toFixed(2) + '×';
           document.getElementById('sliderVoiceVol').value = String(Math.round((st.settings.ttsVolume ?? 0.9) * 100));
@@ -695,9 +928,11 @@
           const voiceBtn = document.getElementById('btnTtsToggle');
           voiceBtn.textContent = 'Voice: ' + (ttsEnabled ? 'ON' : 'OFF');
           voiceBtn.classList.toggle('on', ttsEnabled);
-          document.getElementById('ttsHint').textContent = st.tts.ready
-            ? `Piper ready · ${st.tts.voices.length} local voices · ${st.tts.executable || 'python -m piper'}`
-            : `Piper ${st.tts.status}${st.tts.error ? ' · ' + st.tts.error : ''}`;
+          if (Date.now() > voiceHintUntil) {
+            document.getElementById('ttsHint').textContent = st.tts.ready
+              ? `Piper ready · ${st.tts.voices.length} local voices (auto-discovered) · ${st.tts.executable || 'python -m piper'}`
+              : `Piper ${st.tts.status}${st.tts.error ? ' · ' + st.tts.error : ''}`;
+          }
         }
 
         const vip = st.vipSummary || {};
@@ -756,6 +991,309 @@
         .replace(/"/g, '&quot;');
     }
 
+    // ---------------------------------------------------- voice character profiles
+    let voiceProfilesState = null;
+    let profileCardSignature = '';
+
+    const VP_MODE_LABELS = {
+      maleSeller: 'Use Male Seller',
+      femaleSeller: 'Use Female Seller',
+      alternate: 'Alternate Male / Female',
+      random: 'Random enabled seller'
+    };
+
+    function profileCardHtml(id, profile) {
+      const modes = (voiceProfilesState && voiceProfilesState.announcerModes) || [
+        'maleSeller',
+        'femaleSeller',
+        'alternate',
+        'random'
+      ];
+      const modeBlock =
+        id === 'announcer'
+          ? `<div class="vp-setting">
+              <div class="label-line"><span>Voice selection</span></div>
+              <select data-vp-mode>${modes
+                .map((mode) => `<option value="${mode}">${escapeHtml(VP_MODE_LABELS[mode] || mode)}</option>`)
+                .join('')}</select>
+            </div>`
+          : '';
+      return `
+        <div class="vp-card" data-profile="${escapeHtml(id)}">
+          <div class="vp-head">
+            <span class="vp-icon">${escapeHtml(profile.icon || '🎙️')}</span>
+            <strong>${escapeHtml(profile.label || id)}</strong>
+            <button class="btn" data-vp-toggle>Enabled</button>
+          </div>
+          <div class="hint vp-persona">${escapeHtml(profile.personality || '')}</div>
+          <div class="vp-setting">
+            <div class="label-line"><span>Piper voice</span><span class="vp-meta" data-vp-meta>—</span></div>
+            <select data-vp-voice></select>
+          </div>
+          <div class="vp-setting">
+            <div class="label-line"><span>Language</span></div>
+            <select data-vp-language>
+              <option value="en">English</option>
+              <option value="vi">Vietnamese</option>
+            </select>
+          </div>
+          ${modeBlock}
+          <div class="vp-setting">
+            <div class="label-line"><span>Speed</span><strong data-vp-speed-val>1.00×</strong></div>
+            <input type="range" data-vp-speed min="50" max="200" step="5" value="100" />
+          </div>
+          <div class="vp-setting">
+            <div class="label-line"><span>Volume</span><strong data-vp-volume-val>90%</strong></div>
+            <input type="range" data-vp-volume min="0" max="100" step="5" value="90" />
+          </div>
+          <div class="vp-setting">
+            <div class="vp-pitch"><span>Pitch</span><span>Not supported</span></div>
+            <input type="range" data-vp-pitch min="-50" max="50" step="10" value="0" disabled />
+            <span class="vp-hint">Piper exposes no pitch parameter — disabled, never simulated.</span>
+          </div>
+          <div class="vp-test-row">
+            <button class="btn gold" data-vp-test>🔊 Test Voice</button>
+            <span class="vp-hint" data-vp-hint></span>
+          </div>
+        </div>`;
+    }
+
+    function buildProfileCards(snapshot) {
+      const grid = document.getElementById('vpGrid');
+      if (!grid) return;
+      const ids = snapshot.ids || Object.keys(snapshot.profiles);
+      const signature = ids.join(',');
+      if (signature === profileCardSignature) return;
+      profileCardSignature = signature;
+      grid.innerHTML = ids
+        .filter((id) => snapshot.profiles[id])
+        .map((id) => profileCardHtml(id, snapshot.profiles[id]))
+        .join('');
+    }
+
+    function fillProfileVoiceSelect(card, profile) {
+      const select = card.querySelector('[data-vp-voice]');
+      if (!select) return;
+      const language = profile.language === 'vi' ? 'vi' : 'en';
+      const list = ttsVoices.filter((voice) => voice.language === language && voice.valid !== false);
+      const configured = profile.voice || '';
+      const options = [];
+      if (profile.id === 'announcer') options.push('<option value="">Auto (mode below)</option>');
+      if (profile.missing && configured) {
+        options.push(
+          `<option value="${escapeHtml(configured)}">⚠ ${escapeHtml(configured + ' (missing — fallback)')}</option>`
+        );
+      }
+      for (const voice of list) {
+        options.push(`<option value="${escapeHtml(voice.id)}">${escapeHtml(voiceOptionLabel(voice))}</option>`);
+      }
+      if (!options.length) options.push('<option value="">No model in config/piper</option>');
+      select.innerHTML = options.join('');
+      const auto = profile.id === 'announcer' && !configured;
+      const wanted = auto ? '' : configured || profile.resolvedVoice || '';
+      select.value = [...select.options].some((option) => option.value === wanted)
+        ? wanted
+        : list[0]
+          ? list[0].id
+          : '';
+    }
+
+    function updateProfileCard(id) {
+      if (!voiceProfilesState) return;
+      const profile = voiceProfilesState.profiles[id];
+      const card = document.querySelector(`.vp-card[data-profile="${id}"]`);
+      if (!profile || !card) return;
+      const active = card.contains(document.activeElement);
+
+      card.classList.toggle('disabled', profile.enabled === false);
+      card.classList.toggle('missing-voice', Boolean(profile.missing));
+      const toggle = card.querySelector('[data-vp-toggle]');
+      if (toggle) {
+        toggle.textContent = profile.enabled === false ? 'Disabled' : 'Enabled';
+        toggle.classList.toggle('on', profile.enabled !== false);
+      }
+
+      if (!active) {
+        const language = card.querySelector('[data-vp-language]');
+        if (language) language.value = profile.language === 'vi' ? 'vi' : 'en';
+        fillProfileVoiceSelect(card, profile);
+        const mode = card.querySelector('[data-vp-mode]');
+        if (mode) mode.value = profile.mode || 'alternate';
+        const speed = card.querySelector('[data-vp-speed]');
+        if (speed) speed.value = String(Math.round((profile.speed || 1) * 100));
+        const volume = card.querySelector('[data-vp-volume]');
+        if (volume) volume.value = String(Math.round((profile.volume ?? 0.9) * 100));
+      }
+
+      const speedVal = card.querySelector('[data-vp-speed-val]');
+      if (speedVal) speedVal.textContent = Number(profile.speed || 1).toFixed(2) + '×';
+      const volumeVal = card.querySelector('[data-vp-volume-val]');
+      if (volumeVal) volumeVal.textContent = Math.round((profile.volume ?? 0.9) * 100) + '%';
+      const meta = card.querySelector('[data-vp-meta]');
+      if (meta) {
+        const gender =
+          profile.gender === 'female' ? '♀ Female' : profile.gender === 'male' ? '♂ Male' : '—';
+        meta.textContent = `${gender} · ${profile.resolvedVoiceName || profile.resolvedVoice || 'none'}`;
+      }
+      const hint = card.querySelector('[data-vp-hint]');
+      if (hint && !hint.dataset.locked) {
+        hint.textContent = profile.missing
+          ? `⚠ ${profile.missingVoice} is missing — safe fallback: ${profile.resolvedVoice}`
+          : '';
+      }
+      const test = card.querySelector('[data-vp-test]');
+      if (test) test.disabled = profile.enabled === false;
+    }
+
+    function lockAnnouncerVoiceControls(snapshot) {
+      const announcer = snapshot.profiles.announcer;
+      const note = document.getElementById('annProfileNote');
+      if (note && announcer) {
+        note.textContent =
+          `Announcer voice comes from profile C · ${VP_MODE_LABELS[announcer.mode] || announcer.mode}` +
+          (announcer.voice ? ` · exact voice ${announcer.voice}` : '') +
+          '. Speed, volume and language follow that seller.';
+      }
+      ['annVoiceMode', 'annVoice', 'annSpeed', 'annVol', 'annLanguage'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = true;
+      });
+    }
+
+    function renderVoiceProfiles(snapshot) {
+      if (!snapshot || !snapshot.profiles) return;
+      voiceProfilesState = snapshot;
+      buildProfileCards(snapshot);
+      for (const id of Object.keys(snapshot.profiles)) updateProfileCard(id);
+      lockAnnouncerVoiceControls(snapshot);
+
+      const status = document.getElementById('vpStatus');
+      if (status) {
+        status.textContent =
+          `${Object.keys(snapshot.profiles).length} profiles · saved on the server` +
+          (snapshot.savedAt ? ` · ${new Date(snapshot.savedAt).toLocaleString()}` : '') +
+          ` · announcer: ${VP_MODE_LABELS[snapshot.announcerMode] || snapshot.announcerMode}`;
+      }
+      const note = document.getElementById('vpPitchNote');
+      if (note && snapshot.capabilities) {
+        note.textContent =
+          'Pitch: not supported. ' +
+          snapshot.capabilities.pitchReason +
+          ' Speech volume is applied per item, so changing it never alters audio already playing.';
+      }
+    }
+
+    async function applyProfilePatch(id, patch) {
+      const data = await sendRpc('voice.updateProfile', { profile: id, patch });
+      const result = data && data.result;
+      if (result && result.voiceProfiles) renderVoiceProfiles(result.voiceProfiles);
+      return data;
+    }
+
+    async function testVoiceProfile(id, textOverride) {
+      if (!voiceProfilesState) return;
+      const card = document.querySelector(`.vp-card[data-profile="${id}"]`);
+      const hint = card && card.querySelector('[data-vp-hint]');
+      const preview = document.getElementById('vpPreviewText');
+      const text =
+        String(textOverride || (preview && preview.value) || '').trim() ||
+        'Welcome to Sunny Side Sips!';
+      if (hint) {
+        hint.dataset.locked = '1';
+        hint.textContent = 'Synthesizing through Piper…';
+      }
+      const data = await sendRpc('voice.test', { profile: id, text, broadcast: false });
+      const result = data && data.result;
+      if (result && result.ok && result.url) {
+        const player = document.getElementById('vpAudio');
+        if (player) {
+          player.src = result.url;
+          player.play().catch(() => {});
+        }
+        if (hint) {
+          hint.textContent =
+            `${result.profileLabel || id} · ${result.voice} · ${Number(result.speed).toFixed(2)}× · ` +
+            `${Math.round((result.volume ?? 0.9) * 100)}%` +
+            (result.missingVoice ? ` · ⚠ ${result.missingVoice} missing → fallback` : '');
+        }
+      } else if (hint) {
+        hint.textContent =
+          'Voice failed: ' +
+          ((result && result.error) || (data && data.error && data.error.message) || 'unknown error');
+      }
+      setTimeout(() => {
+        if (hint) delete hint.dataset.locked;
+      }, 7000);
+    }
+
+    (function wireVoiceProfiles() {
+      const grid = document.getElementById('vpGrid');
+      if (!grid) return;
+      grid.addEventListener('input', (event) => {
+        const card = event.target.closest('.vp-card');
+        if (!card) return;
+        if (event.target.matches('[data-vp-speed]')) {
+          const label = card.querySelector('[data-vp-speed-val]');
+          if (label) label.textContent = (Number(event.target.value) / 100).toFixed(2) + '×';
+        }
+        if (event.target.matches('[data-vp-volume]')) {
+          const label = card.querySelector('[data-vp-volume-val]');
+          if (label) label.textContent = event.target.value + '%';
+        }
+      });
+      grid.addEventListener('change', (event) => {
+        const card = event.target.closest('.vp-card');
+        if (!card) return;
+        const id = card.dataset.profile;
+        if (event.target.matches('[data-vp-speed]')) {
+          applyProfilePatch(id, { speed: Number(event.target.value) / 100 });
+        } else if (event.target.matches('[data-vp-volume]')) {
+          applyProfilePatch(id, { volume: Number(event.target.value) / 100 });
+        } else if (event.target.matches('[data-vp-language]')) {
+          const language = event.target.value === 'vi' ? 'vi' : 'en';
+          const first = ttsVoices.find((voice) => voice.language === language && voice.valid !== false);
+          applyProfilePatch(id, { language, voice: first ? first.id : '' });
+        } else if (event.target.matches('[data-vp-voice]')) {
+          applyProfilePatch(id, { voice: event.target.value });
+        } else if (event.target.matches('[data-vp-mode]')) {
+          applyProfilePatch(id, { mode: event.target.value });
+        }
+      });
+      grid.addEventListener('click', (event) => {
+        const card = event.target.closest('.vp-card');
+        if (!card || !voiceProfilesState) return;
+        const id = card.dataset.profile;
+        if (event.target.closest('[data-vp-toggle]')) {
+          const profile = voiceProfilesState.profiles[id];
+          applyProfilePatch(id, { enabled: profile.enabled === false });
+        } else if (event.target.closest('[data-vp-test]')) {
+          testVoiceProfile(id);
+        }
+      });
+
+      const refresh = document.getElementById('btnVoiceProfilesRefresh');
+      if (refresh) {
+        refresh.onclick = async () => {
+          const status = document.getElementById('vpStatus');
+          if (status) status.textContent = 'Scanning config/piper for new models…';
+          await sendRpc('tts.refreshVoices');
+          const data = await sendRpc('voice.getProfiles');
+          const snapshot = data && data.result;
+          if (snapshot && snapshot.profiles) renderVoiceProfiles(snapshot);
+          if (status) status.textContent = 'Voice catalog rescanned · profile selectors updated.';
+        };
+      }
+      const reset = document.getElementById('btnVoiceProfilesReset');
+      if (reset) {
+        reset.onclick = async () => {
+          if (!confirm('Restore all four voice profiles to their default voices and levels?')) return;
+          const data = await sendRpc('voice.resetProfiles');
+          const result = data && data.result;
+          if (result && result.voiceProfiles) renderVoiceProfiles(result.voiceProfiles);
+        };
+      }
+    })();
+
     // ------------------------------------------------------- shop announcer
     const announcerChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('sunny-side-announcer') : null;
     const annStore = window.ShopAnnouncerStore;
@@ -773,6 +1311,11 @@
       const list = annStore.loadList().filter((a) => a.enabled !== false);
       const item = list[0];
       const text = item ? (annSettings.language === 'vi' ? item.textVi || item.textEn : item.textEn || item.textVi) : 'Welcome to Sunny Side Sips!';
+      // Once profiles are loaded the announcer speaks through profile C.
+      if (voiceProfilesState) {
+        testVoiceProfile('announcer', text);
+        return;
+      }
       const voice = annVoicePreview();
       sendRpc('shop.speak', {
         text,
@@ -784,13 +1327,33 @@
     }
 
     function annVoicePreview() {
+      if (annSettings.voice) return annSettings.voice;
       const lang = annSettings.language === 'vi' ? 'vi' : 'en';
-      const map = {
-        en: { female: 'en_US-hfc_female-medium', male: 'en_US-arctic-medium' },
-        vi: { female: 'banmai', male: 'manhdung' }
-      };
-      if (annSettings.voiceMode === 'random') return '';
-      return (map[lang] && map[lang][annSettings.voiceMode]) || '';
+      const pool = ttsVoices.filter((voice) => voice.language === lang && voice.valid !== false);
+      if (!pool.length) return '';
+      if (annSettings.voiceMode === 'random') {
+        return pool[Math.floor(Math.random() * pool.length)].id;
+      }
+      const byGender = pool.filter((voice) => voice.gender === annSettings.voiceMode);
+      const choice = (byGender.length ? byGender : pool)[0];
+      return choice ? choice.id : '';
+    }
+
+    function populateAnnVoiceOptions() {
+      const select = document.getElementById('annVoice');
+      if (!select) return;
+      const lang = annSettings.language === 'vi' ? 'vi' : 'en';
+      const current = annSettings.voice || '';
+      const list = ttsVoices.filter((voice) => voice.language === lang && voice.valid !== false);
+      select.innerHTML =
+        '<option value="">Auto (by seller gender)</option>' +
+        list
+          .map(
+            (voice) =>
+              `<option value="${escapeHtml(voice.id)}">${escapeHtml(voiceOptionLabel(voice))}</option>`
+          )
+          .join('');
+      select.value = list.some((voice) => voice.id === current) ? current : '';
     }
 
     function saveAnnSettings(patch) {
@@ -811,6 +1374,7 @@
       intervalSelect.value = String(annSettings.interval);
       document.getElementById('annLanguage').value = annSettings.language;
       document.getElementById('annVoiceMode').value = annSettings.voiceMode;
+      populateAnnVoiceOptions();
       document.getElementById('annSpeed').value = String(Math.round((annSettings.speed || 1) * 100));
       document.getElementById('valAnnSpeed').textContent = Number(annSettings.speed || 1).toFixed(2) + '×';
       document.getElementById('annVol').value = String(Math.round((annSettings.volume ?? 0.9) * 100));
@@ -885,6 +1449,10 @@
           const item = annStore.loadList().find((a) => a.id === btn.getAttribute('data-ann-test'));
           if (!item) return;
           const text = annSettings.language === 'vi' ? item.textVi || item.textEn : item.textEn || item.textVi;
+          if (voiceProfilesState) {
+            testVoiceProfile('announcer', text);
+            return;
+          }
           sendRpc('shop.speak', {
             text,
             language: annSettings.language,
@@ -946,6 +1514,8 @@
       saveAnnSettings({ language: e.target.value });
     document.getElementById('annVoiceMode').onchange = (e) =>
       saveAnnSettings({ voiceMode: e.target.value });
+    document.getElementById('annVoice').onchange = (e) =>
+      saveAnnSettings({ voice: e.target.value });
     document.getElementById('annSpeed').oninput = (e) => {
       document.getElementById('valAnnSpeed').textContent =
         (Number(e.target.value) / 100).toFixed(2) + '×';
