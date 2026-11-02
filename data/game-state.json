@@ -1,13 +1,45 @@
 {
-  "customersServed": 3,
-  "drinksSold": 3,
-  "totalTips": 32,
-  "likes": 0,
-  "follows": 2,
-  "comments": 0,
-  "gifts": 1,
-  "totalCoins": 20,
+  "customersServed": 12,
+  "drinksSold": 12,
+  "totalTips": 98.25,
+  "likes": 9,
+  "follows": 4,
+  "comments": 3,
+  "gifts": 3,
+  "totalCoins": 120,
   "recentGifts": [
+    {
+      "id": "gift_1793600287595_pb8t",
+      "user": "Mia Carter",
+      "uniqueId": "mia.carter",
+      "avatar": "",
+      "giftId": "coin_25",
+      "giftName": "Grand Ceremony",
+      "giftIcon": "/assets/gift_icon/grandCeremony.webp",
+      "giftCoins": 25,
+      "coins": 50,
+      "units": 2,
+      "drinkId": "lemonade",
+      "drinkName": "Fresh Lemonade",
+      "drinkImage": "/assets/drinks/Lemonade.jpg",
+      "at": "2026-11-02T06:18:07.595Z"
+    },
+    {
+      "id": "gift_1793600262055_tyxr",
+      "user": "Mia Carter",
+      "uniqueId": "mia.carter",
+      "avatar": "",
+      "giftId": "coin_25",
+      "giftName": "Grand Ceremony",
+      "giftIcon": "/assets/gift_icon/grandCeremony.webp",
+      "giftCoins": 25,
+      "coins": 50,
+      "units": 2,
+      "drinkId": "lemonade",
+      "drinkName": "Fresh Lemonade",
+      "drinkImage": "/assets/drinks/Lemonade.jpg",
+      "at": "2026-11-02T06:17:42.055Z"
+    },
     {
       "id": "gift_1793598426226_f3cw",
       "user": "Mia Carter",
@@ -45,6 +77,46 @@
       "drinks": 1,
       "gifts": 0,
       "lastNote": "Followed the shop"
+    },
+    "mia.carter": {
+      "name": "Mia Carter",
+      "uniqueId": "mia.carter",
+      "avatar": "",
+      "tips": 33.25,
+      "coins": 100,
+      "drinks": 6,
+      "gifts": 2,
+      "lastNote": "25 coins x2"
+    },
+    "dylanbrooks": {
+      "name": "Dylan Brooks",
+      "uniqueId": "dylanbrooks",
+      "avatar": "",
+      "tips": 24,
+      "coins": 0,
+      "drinks": 2,
+      "gifts": 0,
+      "lastNote": "Followed the shop"
+    },
+    "ava_sinclair": {
+      "name": "Ava Sinclair",
+      "uniqueId": "ava_sinclair",
+      "avatar": "",
+      "tips": 1,
+      "coins": 0,
+      "drinks": 0,
+      "gifts": 0,
+      "lastNote": "Sent some love to the shop"
+    },
+    "sofiaramos": {
+      "name": "Sofia Ramos",
+      "uniqueId": "sofiaramos",
+      "avatar": "",
+      "tips": 8,
+      "coins": 0,
+      "drinks": 1,
+      "gifts": 0,
+      "lastNote": "Berry smoothie please"
     }
   },
   "settings": {

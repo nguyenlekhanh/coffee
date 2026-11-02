@@ -16,8 +16,15 @@
 
   const W = 1080;
   const H = 1920;
-  const MAX_CUSTOMERS = 20;
-  const MAX_QUEUE = 6;
+  // Hard caps from the viewer character spec.
+  const MAX_CUSTOMERS = 12;
+  const MAX_QUEUE = 5;
+  const VIEWER_LIMITS = { active: 12, visibleWaiting: 5 };
+  const HOLDING_SLOTS = [
+    { x: -150, y: 1470 },
+    { x: W + 150, y: 1470 }
+  ];
+  const HOLDING_SLOT_INDEX = 4; // visible waiting slots are queue slots 0-4
   const DRINK_PRICES = {
     lemonade: 5,
     'iced-coffee': 6,
@@ -258,6 +265,14 @@
       this.time = 0;
       this.lastTs = 0;
       this.tipPops = [];
+      this.viewers = new Map();
+      this.effects = [];
+      this.orderSeq = 0;
+      this.onOrderServed = null;
+      this.pendingEvents = [];
+      this.pendingViewerSync = null;
+      this.viewerRoster = null;
+      this.viewerSyncTimer = 0;
       this.servingId = null;
       this.serveFlash = 0;
       this.ready = false;
@@ -310,6 +325,16 @@
 
       this.ready = true;
       this.lastTs = 0;
+      if (this.pendingViewerSync) {
+        const list = this.pendingViewerSync;
+        this.pendingViewerSync = null;
+        this.syncViewers(list);
+      }
+      if (this.pendingEvents.length) {
+        const queued = this.pendingEvents;
+        this.pendingEvents = [];
+        queued.forEach((ev) => this.handleEvent(ev));
+      }
       if (!this.raf) this.raf = requestAnimationFrame(this.loop);
       return this;
     }
@@ -338,6 +363,9 @@
       this.queue = [];
       this.pending = [];
       this.tipPops = [];
+      this.viewers.clear();
+      this.effects = [];
+      this.orderSeq = 0;
       this.servingId = null;
       this.serveFlash = 0;
       this.session = { served: 0, drinks: 0, tips: 0 };
@@ -376,11 +404,17 @@
     }
 
     spawn(opts = {}) {
-      if (!this.ready || this.customers.length >= MAX_CUSTOMERS) return null;
+      if (!this.ready) return null;
+      // A viewer can only ever own one character.
+      if (opts.viewerId) {
+        const existing = this.viewers.get(opts.viewerId);
+        if (existing && !existing.gone) return existing;
+      }
+      if (this.customers.length >= MAX_CUSTOMERS) return null;
       if (!this.sprites.customers.length || !this.sprites.drinks.length) return null;
-      // Keep the line readable: ambient walk-ins wait for room, viewer events
-      // (priority) may still join so a gift/combo is never silently ignored.
-      if (!opts.priority && this.queue.length >= MAX_QUEUE) return null;
+      // Ambient walk-ins wait for room; viewers always get their character
+      // (extra ones wait off stage in the virtual queue).
+      if (!opts.priority && !opts.viewerId && this.queue.length >= MAX_QUEUE) return null;
 
       const record = opts.record || this.findCustomerSprite(opts.gender);
       const drink = opts.drinkRecord || this.findDrinkSprite(opts.drink);
@@ -392,6 +426,15 @@
         record,
         drink,
         name: opts.name || '',
+        viewerId: opts.viewerId || null,
+        uniqueId: opts.uniqueId || '',
+        spriteIndex: Number.isInteger(opts.spriteIndex) ? opts.spriteIndex : null,
+        orders: [],
+        orderIds: new Set(),
+        wave: 0,
+        celebrate: 0,
+        leaving: false,
+        leaveAfterServe: false,
         vip: Boolean(opts.vip),
         gift: opts.gift || null,
         gender: record.meta.gender,
@@ -415,6 +458,7 @@
       this.customers.push(customer);
       if (opts.priority) this.queue.unshift(customer.id);
       else this.queue.push(customer.id);
+      if (customer.viewerId) this.viewers.set(customer.viewerId, customer);
       return customer;
     }
 
@@ -461,9 +505,275 @@
       }
     }
 
+    // ------------------------------------------------------- viewer characters
+    spriteForIndex(index) {
+      const list = this.sprites.customers;
+      if (!list.length) return null;
+      if (!Number.isInteger(index)) return pickOne(list);
+      return list[((index % list.length) + list.length) % list.length];
+    }
+
+    findViewerCharacter(viewerId) {
+      const found = viewerId ? this.viewers.get(viewerId) : null;
+      return found && !found.gone ? found : null;
+    }
+
+    /** Reuse the viewer's character; create it only the first time they appear. */
+    ensureViewerCharacter(ev) {
+      const viewerId = ev.viewerId;
+      if (!viewerId) return null;
+      const existing = this.findViewerCharacter(viewerId);
+      if (existing) {
+        if (existing.leaving) this.cancelViewerLeave(existing);
+        if (ev.user) existing.name = ev.user;
+        if (ev.uniqueId) existing.uniqueId = ev.uniqueId;
+        if (Number.isInteger(ev.sprite)) existing.spriteIndex = ev.sprite;
+        return existing;
+      }
+      if (this.customers.length >= MAX_CUSTOMERS) return null;
+      const record = this.spriteForIndex(Number.isInteger(ev.sprite) ? ev.sprite : null);
+      if (!record) return null;
+      const character = this.spawn({
+        name: ev.user || 'Viewer',
+        uniqueId: ev.uniqueId || '',
+        viewerId,
+        spriteIndex: Number.isInteger(ev.sprite) ? ev.sprite : null,
+        record,
+        priority: Boolean(ev.vip || ev.priority)
+      });
+      return character;
+    }
+
+    /** Gift senders move ahead of passive viewers in the waiting line. */
+    prioritise(character) {
+      if (!character) return;
+      this.queue = this.queue.filter((id) => id !== character.id);
+      this.queue.unshift(character.id);
+    }
+
+    enqueueViewerOrders(character, base, opts = {}) {
+      if (!character) return;
+      const units = Math.round(clamp(Number(opts.units) || 1, 1, 20));
+      const order = base && base[0] ? base[0] : {};
+      if (!order.drink && !order.giftName) return;
+      let added = 0;
+      for (let i = 0; i < units; i++) {
+        const id = order.id
+          ? i === 0
+            ? String(order.id)
+            : `${order.id}_${i}`
+          : `local_${character.id}_${++this.orderSeq}`;
+        if (character.orderIds.has(id)) continue; // combo replay never doubles an order
+        character.orderIds.add(id);
+        character.orders.push({
+          id,
+          drink: order.drink || null,
+          coins: i === 0 ? Number(order.coins) || 0 : 0,
+          giftName: order.giftName || ''
+        });
+        added += 1;
+      }
+      if (added && order.drink) character.drink = order.drink;
+      if (added && opts.front) this.prioritise(character);
+      // A big tray should never push the personal queue past the cap.
+      if (character.orders.length > 20) character.orders.splice(0, character.orders.length - 20);
+    }
+
+    startViewerLeave(character) {
+      if (!character) return;
+      character.leaving = true;
+      character.leaveAfterServe = character.state === 'order';
+      if (character.leaveAfterServe) return; // finish the serving animation first
+      this.finishViewerLeave(character);
+    }
+
+    finishViewerLeave(character) {
+      character.leaving = true;
+      character.leaveAfterServe = false;
+      this.queue = this.queue.filter((id) => id !== character.id);
+      if (character.table && character.seat) {
+        character.table.occupants[character.seat.index] = null;
+      }
+      character.table = null;
+      character.seat = null;
+      character.bubble = { text: 'Thanks! See you next live 👋', timer: 2600 };
+      character.waypoints = [
+        { x: character.x < W / 2 ? 430 : 700, y: 1730 },
+        this.exitFor(character)
+      ];
+      character.state = 'leave';
+      character.cupInHand = false;
+      this.heartsAround(character, 4);
+    }
+
+    cancelViewerLeave(character) {
+      character.leaving = false;
+      character.leaveAfterServe = false;
+      character.bubble = { text: 'Back again!', timer: 1600 };
+      if (character.table) {
+        character.state = 'seated';
+        character.waypoints = [];
+        return;
+      }
+      if (!this.queue.includes(character.id)) this.queue.push(character.id);
+      character.state = 'queue';
+      character.waypoints = [];
+    }
+
+    celebrate(character) {
+      if (!character) return;
+      character.celebrate = Math.max(character.celebrate, 2.6);
+      this.effects.push({
+        kind: 'burst',
+        x: character.x,
+        y: character.y - 300 * this.customerScale(character),
+        t: 0,
+        life: 1.6
+      });
+    }
+
+    heartsAround(character, count = 4) {
+      if (!character) return;
+      const scale = this.customerScale(character);
+      for (let i = 0; i < count; i++) {
+        this.effects.push({
+          kind: 'heart',
+          x: character.x + rand(-46, 46),
+          y: character.y - rand(210, 330) * scale,
+          vy: rand(48, 92),
+          drift: rand(-22, 22),
+          size: rand(12, 22),
+          t: 0,
+          life: rand(1.1, 2)
+        });
+      }
+    }
+
+    handleViewerEvent(ev) {
+      const character = this.ensureViewerCharacter(ev);
+      if (!character) {
+        console.warn('[ShopGame] Character cap reached for', ev.user);
+        return;
+      }
+      if (ev.vip) character.vip = true;
+
+      if (ev.type === 'viewerJoin' || ev.type === 'viewerReconnect') {
+        character.leaving = false;
+        character.leaveAfterServe = false;
+        character.bubble = { text: ev.type === 'viewerReconnect' ? 'Back again!' : 'Hi everyone!', timer: 1800 };
+        return;
+      }
+      if (ev.type === 'viewerLeave') {
+        this.startViewerLeave(character);
+        return;
+      }
+      if (this.settings.paused) return;
+
+      switch (ev.type) {
+        case 'followGuest':
+        case 'freeDrink':
+          character.vip = true;
+          this.celebrate(character);
+          this.heartsAround(character, 6);
+          break;
+        case 'likeBurst':
+          character.wave = 2.4;
+          this.heartsAround(character, Math.min(10, 3 + Math.round((Number(ev.count) || 1) / 2)));
+          break;
+        case 'commentOrder': {
+          const text = ev.bubbleText || ev.message || (ev.drink ? `One ${ev.drink.name}, please!` : 'Hello!');
+          character.bubble = { text, drink: ev.drink, timer: 3200 };
+          this.enqueueViewerOrders(character, [{ id: ev.orderId, drink: ev.drink, coins: 0 }], {
+            units: Number(ev.count) || 1
+          });
+          break;
+        }
+        case 'giftOrder':
+        case 'partyOrder': {
+          const units = Math.max(1, Number(ev.units || ev.count || ev.groupSize) || 1);
+          character.bubble = {
+            text:
+              ev.type === 'partyOrder'
+                ? `${ev.giftName || 'Party tray'} · ${units} drinks`
+                : `${ev.giftName || 'Gift'} → ${ev.drink ? ev.drink.name : 'drink'}`,
+            drink: ev.drink,
+            timer: 3200
+          };
+          this.enqueueViewerOrders(
+            character,
+            [{ id: ev.orderId, drink: ev.drink, coins: Number(ev.coins) || 0, giftName: ev.giftName }],
+            { units, front: true }
+          );
+          this.celebrate(character);
+          break;
+        }
+        case 'mysteryDrink':
+        case 'serveDrink':
+          character.bubble = { text: ev.message || 'One fresh drink!', drink: ev.drink, timer: 2800 };
+          this.enqueueViewerOrders(character, [{ id: ev.orderId, drink: ev.drink, coins: 0 }], {
+            units: Number(ev.count) || 1
+          });
+          break;
+        default:
+          break;
+      }
+    }
+
+    /** Rebuild characters for viewers that joined before this page loaded. */
+    syncViewers(list) {
+      if (!Array.isArray(list)) return;
+      this.viewerRoster = list;
+      if (!this.ready) {
+        this.pendingViewerSync = list;
+        return;
+      }
+      for (const viewer of list) {
+        if (!viewer || viewer.id == null || viewer.leftAt) continue;
+        let character = this.findViewerCharacter(viewer.id);
+        if (!character) {
+          character = this.ensureViewerCharacter({
+            viewerId: viewer.id,
+            user: viewer.name,
+            uniqueId: viewer.uniqueId,
+            sprite: viewer.sprite,
+            vip: viewer.vip
+          });
+        }
+        if (!character) continue;
+        character.vip = Boolean(character.vip || viewer.vip);
+        for (const order of viewer.orders || []) {
+          this.enqueueViewerOrders(
+            character,
+            [
+              {
+                id: order.id,
+                drink: this.findDrinkSprite(order.drinkId),
+                coins: Number(order.coins) || 0,
+                giftName: order.giftName || ''
+              }
+            ],
+            { units: 1 }
+          );
+        }
+        // Viewers with paid orders waiting are served before passive guests.
+        if (character.orders.length) this.prioritise(character);
+      }
+    }
+
     /** Map a server event (TikTok interaction) onto the simulation. */
     handleEvent(ev) {
-      if (!ev || this.settings.paused) return;
+      if (!ev) return;
+      // Art is still decoding: replay the interaction once sprites exist.
+      if (!this.ready) {
+        this.pendingEvents.push(ev);
+        if (this.pendingEvents.length > 40) this.pendingEvents.shift();
+        return;
+      }
+      if (ev.viewerId) {
+        this.handleViewerEvent(ev);
+        return;
+      }
+      if (this.settings.paused) return;
       switch (ev.type) {
         case 'serveDrink':
         case 'commentOrder':
@@ -545,14 +855,20 @@
       customer.state = 'order';
       customer.orderTimer = rand(900, 1250);
       this.servingId = customer.id;
+      const order = customer.orders && customer.orders[0];
+      if (order && order.drink) customer.drink = order.drink;
+      const drink = customer.drink;
+      const coins = order ? Number(order.coins) || 0 : 0;
       customer.bubble = {
-        text: customer.gift
-          ? `${customer.gift.name} gift · one ${customer.drink.name}!`
-          : customer.vip
-            ? 'New follower treat!'
-            : `One ${customer.drink.name}, please!`,
-        drink: customer.drink,
-        timer: 1700
+        text: coins > 0
+          ? `${order.giftName || 'Gift'} · ${drink.name} · ${coins} coins`
+          : customer.gift
+            ? `${customer.gift.name} gift · one ${drink.name}!`
+            : customer.vip
+              ? 'New follower treat!'
+              : `One ${drink.name}, please!`,
+        drink,
+        timer: 2200
       };
     }
 
@@ -561,6 +877,9 @@
       this.servingId = null;
       this.serveFlash = 1;
       customer.cupInHand = true;
+
+      const servedOrder = customer.orders && customer.orders.length ? customer.orders.shift() : null;
+      if (servedOrder && servedOrder.drink) customer.drink = servedOrder.drink;
 
       const price = DRINK_PRICES[customer.drink.id] != null ? DRINK_PRICES[customer.drink.id] : 4;
       const bonus = customer.vip ? 6 : 1;
@@ -576,12 +895,47 @@
         life: 1
       });
 
+      if (servedOrder && servedOrder.coins > 0) {
+        this.tipPops.push({
+          text: `+${servedOrder.coins} 💰`,
+          x: customer.x + 46,
+          y: customer.y - 268 * this.customerScale(customer),
+          life: 1
+        });
+      }
+
       if (this.onSale) {
         this.onSale({
           tip: totalTip,
           drink: customer.drink ? customer.drink.name : '',
           name: customer.name || 'Walk-in guest'
         });
+      }
+
+      if (servedOrder && customer.viewerId && this.onOrderServed) {
+        this.onOrderServed({
+          viewerId: customer.viewerId,
+          uniqueId: customer.uniqueId,
+          name: customer.name,
+          orderId: servedOrder.id,
+          coins: servedOrder.coins
+        });
+      }
+
+      // Viewer left mid-service: finish this drink, then wave goodbye.
+      if (customer.leaveAfterServe) {
+        customer.cupInHand = false;
+        this.finishViewerLeave(customer);
+        return;
+      }
+
+      // More drinks in this viewer's personal queue → stay at the counter.
+      if (customer.orders.length) {
+        customer.cupInHand = false;
+        this.queue.unshift(customer.id);
+        customer.state = 'queue';
+        customer.bubble = { text: `${customer.orders.length} more coming up!`, timer: 1600 };
+        return;
       }
 
       const seat = this.findSeat();
@@ -606,6 +960,12 @@
     }
 
     finishDrink(customer) {
+      // A viewer's character stays in the shop until they actually leave.
+      if (customer.viewerId) {
+        customer.seatedTimer = rand(6000, 9000);
+        customer.bubble = { text: 'That hit the spot!', timer: 1400 };
+        return;
+      }
       if (customer.table && typeof customer.seat.index === 'number') {
         customer.table.occupants[customer.seat.index] = null;
       }
@@ -626,6 +986,16 @@
 
       this.serveFlash = Math.max(0, this.serveFlash - dt * 1.6);
 
+      for (let i = this.effects.length - 1; i >= 0; i--) {
+        const fx = this.effects[i];
+        fx.t += dt;
+        if (fx.kind === 'heart') {
+          fx.y -= fx.vy * dt;
+          fx.x += fx.drift * dt;
+        }
+        if (fx.t >= fx.life) this.effects.splice(i, 1);
+      }
+
       // delayed spawns (rush / party trays)
       if (this.pending.length) {
         const due = this.pending.filter((p) => p.at <= this.time);
@@ -633,7 +1003,8 @@
         due.forEach((p) => this.spawn(p.opts));
       }
 
-      if (this.settings.running) {
+      // Walk-in extras only fill an empty shop; viewers own the floor otherwise.
+      if (this.settings.running && this.viewers.size === 0) {
         this.spawnTimer -= dt * 1000;
         if (this.spawnTimer <= 0) {
           this.spawn();
@@ -647,6 +1018,8 @@
           if (customer.bubble.timer <= 0) customer.bubble = null;
         }
         customer.walkPhase += dt * 8;
+        if (customer.wave > 0) customer.wave = Math.max(0, customer.wave - dt);
+        if (customer.celebrate > 0) customer.celebrate = Math.max(0, customer.celebrate - dt);
 
         switch (customer.state) {
           case 'enter': {
@@ -661,10 +1034,14 @@
               break;
             }
             let slot;
-            if (index < LAYOUT.queueSlots.length) {
-              slot = LAYOUT.queueSlots[index];
+            if (index < VIEWER_LIMITS.visibleWaiting) {
+              slot =
+                index < LAYOUT.queueSlots.length
+                  ? LAYOUT.queueSlots[index]
+                  : LAYOUT.overflow[Math.min(index - LAYOUT.queueSlots.length, LAYOUT.overflow.length - 1)];
             } else {
-              slot = LAYOUT.overflow[Math.min(index - LAYOUT.queueSlots.length, LAYOUT.overflow.length - 1)];
+              // Virtual waiting queue: no room at the counter, wait off stage.
+              slot = HOLDING_SLOTS[index % HOLDING_SLOTS.length];
             }
             const arrived = this.moveToward(customer, slot, customer.speed * dt);
             if (index === 0 && arrived && !this.servingId) this.beginOrder(customer);
@@ -700,6 +1077,20 @@
 
       this.separateWalkers();
       this.customers = this.customers.filter((c) => !c.gone);
+
+      // Someone joined while the floor was full (usually leaving characters):
+      // retry once a slot opens so no viewer is lost.
+      this.viewerSyncTimer += dt;
+      if (this.viewerRoster && this.viewerSyncTimer > 2) {
+        this.viewerSyncTimer = 0;
+        const waiting = this.viewerRoster.filter((viewer) => viewer && !viewer.leftAt);
+        if (this.viewers.size < waiting.length && this.customers.length < MAX_CUSTOMERS) {
+          this.syncViewers(this.viewerRoster);
+        }
+      }
+      for (const [viewerId, character] of this.viewers) {
+        if (character.gone) this.viewers.delete(viewerId);
+      }
     }
 
     separateWalkers() {
@@ -768,7 +1159,48 @@
       }
       drawables.sort((a, b) => a.y - b.y).forEach((item) => item.draw());
 
+      this.drawEffects(ctx);
       this.drawTipPops(ctx);
+    }
+
+    drawEffects(ctx) {
+      for (const fx of this.effects) {
+        const alpha = clamp(1 - fx.t / fx.life, 0, 1);
+        if (fx.kind === 'heart') {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.translate(fx.x, fx.y);
+          const s = fx.size;
+          ctx.beginPath();
+          ctx.moveTo(0, s * 0.35);
+          ctx.bezierCurveTo(-s, -s * 0.4, -s * 0.5, -s, 0, -s * 0.45);
+          ctx.bezierCurveTo(s * 0.5, -s, s, -s * 0.4, 0, s * 0.35);
+          ctx.fillStyle = '#ef5a4b';
+          ctx.fill();
+          ctx.strokeStyle = COLORS.ink;
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          ctx.restore();
+        } else if (fx.kind === 'burst') {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.translate(fx.x, fx.y);
+          const radius = 26 + fx.t * 90;
+          ctx.strokeStyle = COLORS.sun;
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
+          ctx.stroke();
+          for (let i = 0; i < 8; i++) {
+            const a = (Math.PI / 4) * i + fx.t * 2;
+            ctx.beginPath();
+            ctx.arc(Math.cos(a) * radius, Math.sin(a) * radius, 6, 0, Math.PI * 2);
+            ctx.fillStyle = i % 2 === 0 ? COLORS.coral : COLORS.sun;
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+      }
     }
 
     drawGround(ctx) {
@@ -1011,6 +1443,9 @@
       ctx.translate(customer.x, feetY);
       if (walking) {
         ctx.rotate(Math.sin(customer.walkPhase) * 0.018);
+      } else if (customer.wave > 0) {
+        // Waving = a happy little rock instead of a walk cycle.
+        ctx.rotate(Math.sin(this.time * 16) * 0.055);
       }
       ctx.scale(customer.facing < 0 ? -1 : 1, seated ? 0.95 : 1);
       ctx.drawImage(sprite.canvas, -width / 2, -height, width, height);
@@ -1026,6 +1461,14 @@
       }
 
       if (customer.vip) this.drawCrown(ctx, customer.x, feetY - height - 10, scale);
+      if (customer.wave > 0) {
+        ctx.save();
+        ctx.font = `${Math.round(34 * clamp(scale, 0.8, 1.1))}px "Nunito", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = clamp(customer.wave, 0, 1);
+        ctx.fillText('👋', customer.x + 34 * scale, feetY - height - 58 * scale);
+        ctx.restore();
+      }
       if (customer.name) this.drawNameTag(ctx, customer, feetY - height - (customer.vip ? 34 : 12), scale);
       if (customer.bubble) this.drawBubble(ctx, customer.x, feetY - height - 6, customer.bubble, scale);
     }
@@ -1056,7 +1499,12 @@
       ctx.font = `800 ${Math.round(19 * clamp(scale, 0.8, 1.1))}px "Nunito", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const label = customer.gift ? `${customer.name} · ${customer.gift.name}` : customer.name;
+      const pending = customer.orders ? customer.orders.length : 0;
+      const label = pending > 1
+        ? `${customer.name} · ${pending} orders`
+        : customer.gift
+          ? `${customer.name} · ${customer.gift.name}`
+          : customer.name;
       const text = ellipsize(ctx, label, 210);
       const tagH = 32;
       const tagW = Math.max(64, ctx.measureText(text).width + 26);

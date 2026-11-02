@@ -587,7 +587,23 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value)));
 }
 
+// Current live session only — restarting the shop starts a fresh scoreboard.
 function getLeaderboard(limit = 6) {
+  return [...liveSession.supporters.values()]
+    .sort((a, b) => (b.coins || 0) - (a.coins || 0) || (b.drinks || 0) - (a.drinks || 0))
+    .slice(0, limit)
+    .map((s, index) => ({
+      rank: index + 1,
+      name: s.name,
+      uniqueId: s.uniqueId,
+      coins: round2(s.coins || 0),
+      drinks: s.drinks || 0,
+      gifts: s.gifts || 0
+    }));
+}
+
+// All-time totals, kept separate from the live session scoreboard.
+function getLifetimeLeaderboard(limit = 8) {
   return Object.values(state.supporters)
     .sort((a, b) => (b.coins || 0) - (a.coins || 0) || b.tips - a.tips)
     .slice(0, limit)
@@ -713,6 +729,204 @@ function pickMysteryCard() {
   return MYSTERY_DECK[Math.floor(Math.random() * MYSTERY_DECK.length)];
 }
 
+// ============================================================================
+// 4b. VIEWER CHARACTER SYSTEM
+// One TikTok viewer = one persistent game character for the whole live session.
+// ============================================================================
+const VIEWER_LIMITS = { active: 12, visibleWaiting: 5, ttlMs: 15 * 60 * 1000 };
+const CUSTOMER_SPRITE_COUNT = 10;
+
+const viewerSessions = new Map();
+let viewerSeq = 0;
+let sessionSeq = 0;
+
+const liveSession = {
+  id: '',
+  startedAt: '',
+  coins: 0,
+  drinks: 0,
+  served: 0,
+  supporters: new Map()
+};
+
+function startLiveSession() {
+  sessionSeq += 1;
+  liveSession.id = `live_${Date.now()}_${sessionSeq}`;
+  liveSession.startedAt = new Date().toISOString();
+  liveSession.coins = 0;
+  liveSession.drinks = 0;
+  liveSession.served = 0;
+  liveSession.supporters.clear();
+}
+startLiveSession();
+
+function viewerKey(user, uniqueId) {
+  const uid = String(uniqueId || '').trim().toLowerCase();
+  if (uid) return `u:${uid.slice(0, 40)}`;
+  return `n:${sanitizeUserName(user || 'guest').toLowerCase()}`;
+}
+
+// Gift senders jump ahead of passive viewers; ties fall back to arrival order.
+function activeViewers() {
+  return [...viewerSessions.values()]
+    .filter((viewer) => !viewer.leftAt)
+    .sort((a, b) => {
+      if ((b.giftOrders || 0) !== (a.giftOrders || 0)) return (b.giftOrders || 0) - (a.giftOrders || 0);
+      return a.joinedAt - b.joinedAt;
+    });
+}
+
+function viewerRank(viewer) {
+  const index = activeViewers().findIndex((entry) => entry.id === viewer.id);
+  return index === -1 ? VIEWER_LIMITS.active : index;
+}
+
+// Spread characters over the ten customer sprites instead of cloning faces.
+function pickViewerSprite() {
+  const used = new Map();
+  for (const viewer of viewerSessions.values()) {
+    if (viewer.leftAt) continue;
+    used.set(viewer.sprite, (used.get(viewer.sprite) || 0) + 1);
+  }
+  const counts = [];
+  for (let i = 0; i < CUSTOMER_SPRITE_COUNT; i++) counts.push(used.get(i) || 0);
+  const fewest = Math.min(...counts);
+  const free = [];
+  for (let i = 0; i < CUSTOMER_SPRITE_COUNT; i++) if (counts[i] === fewest) free.push(i);
+  return free[Math.floor(Math.random() * free.length)];
+}
+
+function viewerSnapshot(viewer, rank = viewerRank(viewer)) {
+  if (!viewer) return null;
+  return {
+    id: viewer.id,
+    uniqueId: viewer.uniqueId,
+    name: viewer.name,
+    avatar: viewer.avatar,
+    sprite: viewer.sprite,
+    vip: Boolean(viewer.vip),
+    coins: round2(viewer.coins),
+    drinks: viewer.drinks,
+    likes: viewer.likes,
+    comments: viewer.comments,
+    follows: viewer.follows,
+    gifts: viewer.gifts,
+    joinedAt: viewer.joinedAt,
+    leftAt: viewer.leftAt || 0,
+    rank,
+    visible: rank < VIEWER_LIMITS.active,
+    holding: rank >= VIEWER_LIMITS.visibleWaiting,
+    pendingOrders: viewer.orders.length,
+    orders: viewer.orders.slice(0, 5)
+  };
+}
+
+// Repeated joins, follows and gifts all resolve to the same viewer record.
+function ensureViewer(params = {}) {
+  const now = Date.now();
+  const name = sanitizeUserName(params.user || params.uniqueId || 'Guest');
+  const key = viewerKey(name, params.uniqueId);
+  let viewer = viewerSessions.get(key);
+  let created = false;
+  let rejoined = false;
+
+  if (viewer && viewer.leftAt && now - viewer.leftAt > VIEWER_LIMITS.ttlMs) {
+    viewerSessions.delete(key);
+    viewer = null;
+  }
+
+  if (!viewer) {
+    viewer = {
+      id: `v_${++viewerSeq}`,
+      key,
+      uniqueId: String(params.uniqueId || key).slice(0, 40),
+      name,
+      avatar: params.avatar || '',
+      sprite: pickViewerSprite(),
+      vip: Boolean(params.vip),
+      joinedAt: now,
+      lastSeenAt: now,
+      leftAt: 0,
+      coins: 0,
+      drinks: 0,
+      likes: 0,
+      comments: 0,
+      follows: 0,
+      gifts: 0,
+      giftOrders: 0,
+      orders: [],
+      joins: 1,
+      reconnects: 0
+    };
+    viewerSessions.set(key, viewer);
+    created = true;
+  } else {
+    if (viewer.leftAt) {
+      viewer.leftAt = 0;
+      viewer.reconnects += 1;
+      viewer.joins += 1;
+      rejoined = true;
+    }
+    viewer.lastSeenAt = now;
+    if (name && name !== 'Guest') viewer.name = name;
+    if (params.avatar && !viewer.avatar) viewer.avatar = params.avatar;
+    if (params.vip) viewer.vip = true;
+  }
+
+  return { viewer, created, rejoined };
+}
+
+function recordViewerStats(viewer, delta = {}) {
+  if (!viewer) return;
+  viewer.coins = round2(viewer.coins + (delta.coins || 0));
+  viewer.drinks += delta.drinks || 0;
+  viewer.likes += delta.likes || 0;
+  viewer.comments += delta.comments || 0;
+  viewer.follows += delta.follows || 0;
+  viewer.gifts += delta.gifts || 0;
+  viewer.giftOrders += delta.giftOrders || 0;
+
+  liveSession.coins = round2(liveSession.coins + (delta.coins || 0));
+  liveSession.drinks += delta.drinks || 0;
+
+  const support =
+    liveSession.supporters.get(viewer.id) ||
+    { name: viewer.name, uniqueId: viewer.uniqueId, coins: 0, drinks: 0, gifts: 0 };
+  support.name = viewer.name;
+  support.coins = round2(support.coins + (delta.coins || 0));
+  support.drinks += delta.drinks || 0;
+  support.gifts += delta.gifts || 0;
+  liveSession.supporters.set(viewer.id, support);
+}
+
+// A viewer keeps a personal order queue; every gift appends to it.
+function enqueueViewerOrder(viewer, order) {
+  if (!viewer || !order) return null;
+  const entry = {
+    id: order.id || `ord_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    drinkId: order.drinkId,
+    drinkName: order.drinkName,
+    drinkImage: order.drinkImage || '',
+    coins: round2(order.coins || 0),
+    tip: round2(order.tip || 0),
+    giftName: order.giftName || '',
+    giftIcon: order.giftIcon || '',
+    at: new Date().toISOString()
+  };
+  // Combo updates replay the same order id — never queue it twice.
+  if (viewer.orders.some((existing) => existing.id === entry.id)) return entry;
+  viewer.orders.push(entry);
+  if (viewer.orders.length > 20) viewer.orders.splice(0, viewer.orders.length - 20);
+  return entry;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, viewer] of viewerSessions) {
+    if (viewer.leftAt && now - viewer.leftAt > VIEWER_LIMITS.ttlMs) viewerSessions.delete(key);
+  }
+}, 60 * 1000).unref?.();
+
 function getPublicState() {
   return {
     shop: SHOP_NAME,
@@ -735,6 +949,23 @@ function getPublicState() {
       recentGifts: state.recentGifts.slice(0, 6)
     },
     leaderboard: getLeaderboard(8),
+    lifetimeLeaderboard: getLifetimeLeaderboard(8),
+    session: {
+      id: liveSession.id,
+      startedAt: liveSession.startedAt,
+      coins: round2(liveSession.coins),
+      drinks: liveSession.drinks,
+      served: liveSession.served,
+      supporters: liveSession.supporters.size
+    },
+    viewers: activeViewers().map((viewer, index) => viewerSnapshot(viewer, index)),
+    viewerSummary: {
+      active: activeViewers().length,
+      maxActive: VIEWER_LIMITS.active,
+      visibleWaiting: VIEWER_LIMITS.visibleWaiting,
+      holding: Math.max(0, activeViewers().length - VIEWER_LIMITS.visibleWaiting),
+      recentlyLeft: [...viewerSessions.values()].filter((viewer) => viewer.leftAt).length
+    },
     recentEvents: state.recentEvents.slice(0, 12),
     settings: state.settings,
     tiktok: state.tiktok,
@@ -759,6 +990,16 @@ const Actions = {
     state.drinksSold += count;
     if (params.guest !== true) state.comments += 1;
     const supporter = recordSupporter(name, uniqueId, avatar, tip, count, 0, note);
+    const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
+    recordViewerStats(viewer, { drinks: count });
+    const viewerOrder = enqueueViewerOrder(viewer, {
+      id: params.orderId,
+      drinkId: drink.id,
+      drinkName: drink.name,
+      drinkImage: drink.image,
+      coins: 0,
+      tip
+    });
 
     const ttsText =
       params.readTts === false
@@ -770,6 +1011,8 @@ const Actions = {
 
     const event = pushEventLog({
       type: 'serveDrink',
+      viewerId: viewer.id,
+      orderId: viewerOrder ? viewerOrder.id : null,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -802,9 +1045,13 @@ const Actions = {
 
     state.likes += count;
     const supporter = recordSupporter(name, uniqueId, avatar, tip, 0, 0, 'Sent some love to the shop');
+    const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
+    recordViewerStats(viewer, { likes: count });
 
     const event = pushEventLog({
       type: 'likeBurst',
+      viewerId: viewer.id,
+      wave: true,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -832,6 +1079,9 @@ const Actions = {
     state.customersServed += 1;
     state.drinksSold += 1;
     const supporter = recordSupporter(name, uniqueId, avatar, tip, 1, 0, 'Followed the shop');
+    const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
+    viewer.vip = true;
+    recordViewerStats(viewer, { drinks: 1, follows: 1 });
 
     const ttsText =
       params.readTts === false
@@ -843,6 +1093,8 @@ const Actions = {
 
     const event = pushEventLog({
       type: 'followGuest',
+      viewerId: viewer.id,
+      celebrate: true,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -927,9 +1179,26 @@ const Actions = {
     state.recentGifts.unshift(giftEntry);
     if (state.recentGifts.length > 12) state.recentGifts.length = 12;
 
+    const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
+    recordViewerStats(viewer, { coins, drinks: units, gifts: 1, giftOrders: 1 });
+    for (let i = 0; i < units; i++) {
+      enqueueViewerOrder(viewer, {
+        id: i === 0 ? giftEntry.id : `${giftEntry.id}_${i}`,
+        drinkId: drink.id,
+        drinkName: drink.name,
+        drinkImage: drink.image,
+        coins: tier.coins * units,
+        tip: i === 0 ? tip : 0,
+        giftName,
+        giftIcon: tier.icon
+      });
+    }
+
     const event = pushEventLog({
       type: 'giftOrder',
+      viewerId: viewer.id,
       orderId: giftEntry.id,
+      pendingOrders: viewer.orders.length,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -968,6 +1237,18 @@ const Actions = {
     state.customersServed += groupSize;
     state.drinksSold += groupSize;
     const supporter = recordSupporter(name, uniqueId, avatar, tip, groupSize, 1, `Gift: ${giftName}`);
+    const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
+    recordViewerStats(viewer, { coins, drinks: groupSize, gifts: 1, giftOrders: 1 });
+    for (let i = 0; i < groupSize; i++) {
+      enqueueViewerOrder(viewer, {
+        drinkId: drink.id,
+        drinkName: drink.name,
+        drinkImage: drink.image,
+        coins: i === 0 ? coins : 0,
+        tip: i === 0 ? tip : 0,
+        giftName
+      });
+    }
 
     const ttsText =
       params.readTts === false
@@ -979,6 +1260,8 @@ const Actions = {
 
     const event = pushEventLog({
       type: 'partyOrder',
+      viewerId: viewer.id,
+      pendingOrders: viewer.orders.length,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -1011,6 +1294,15 @@ const Actions = {
     state.customersServed += 1;
     state.drinksSold += 1;
     const supporter = recordSupporter(name, uniqueId, avatar, tip, 1, 0, `Mystery sip: ${card.title}`);
+    const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
+    recordViewerStats(viewer, { drinks: 1 });
+    enqueueViewerOrder(viewer, {
+      drinkId: drink.id,
+      drinkName: drink.name,
+      drinkImage: drink.image,
+      coins: 0,
+      tip
+    });
 
     const ttsText =
       params.readTts === false
@@ -1022,6 +1314,7 @@ const Actions = {
 
     const event = pushEventLog({
       type: 'mysteryDrink',
+      viewerId: viewer.id,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -1054,6 +1347,15 @@ const Actions = {
     state.customersServed += count;
     state.drinksSold += count;
     const supporter = recordSupporter(name, uniqueId, avatar, tip, count, 0, text);
+    const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
+    recordViewerStats(viewer, { comments: 1, drinks: count });
+    enqueueViewerOrder(viewer, {
+      drinkId: drink.id,
+      drinkName: drink.name,
+      drinkImage: drink.image,
+      coins: 0,
+      tip
+    });
 
     const ttsText =
       params.readTts === false
@@ -1065,6 +1367,8 @@ const Actions = {
 
     const event = pushEventLog({
       type: 'commentOrder',
+      viewerId: viewer.id,
+      bubbleText: text || `One ${drink.name}, please!`,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -1081,6 +1385,90 @@ const Actions = {
     saveState();
     broadcastNotification('temple.event', { event, state: getPublicState() });
     return { event, state: getPublicState() };
+  },
+
+  viewerJoin(params = {}) {
+    const { viewer, created, rejoined } = ensureViewer(params);
+    const rank = viewerRank(viewer);
+    const snapshot = viewerSnapshot(viewer, rank);
+    const event = pushEventLog({
+      type: created || !rejoined ? 'viewerJoin' : 'viewerReconnect',
+      viewerId: viewer.id,
+      user: viewer.name,
+      uniqueId: viewer.uniqueId,
+      avatar: viewer.avatar,
+      sprite: viewer.sprite,
+      vip: viewer.vip,
+      created,
+      rejoined,
+      duplicate: !created && !rejoined,
+      rank,
+      visible: rank < VIEWER_LIMITS.active,
+      holding: rank >= VIEWER_LIMITS.visibleWaiting,
+      pendingOrders: viewer.orders.length,
+      message: created ? 'Joined the live' : rejoined ? 'Came back' : 'Already in the shop',
+      ttsText: ''
+    });
+    broadcastNotification('temple.event', { event, state: getPublicState() });
+    return { ok: true, created, rejoined, event, viewer: snapshot, state: getPublicState() };
+  },
+
+  viewerLeave(params = {}) {
+    const key = viewerKey(params.user || params.uniqueId, params.uniqueId);
+    const viewer = viewerSessions.get(key);
+    if (!viewer) return { ok: false, reason: 'Unknown viewer' };
+    if (viewer.leftAt) return { ok: true, alreadyLeft: true, viewer: viewerSnapshot(viewer, VIEWER_LIMITS.active) };
+    viewer.leftAt = Date.now();
+    viewer.lastSeenAt = viewer.leftAt;
+    const event = pushEventLog({
+      type: 'viewerLeave',
+      viewerId: viewer.id,
+      user: viewer.name,
+      uniqueId: viewer.uniqueId,
+      sprite: viewer.sprite,
+      pendingOrders: viewer.orders.length,
+      message: 'Left the live',
+      ttsText: ''
+    });
+    broadcastNotification('temple.event', { event, state: getPublicState() });
+    return { ok: true, event, state: getPublicState() };
+  },
+
+  // The stage reports a finished order so the personal queue stays accurate.
+  viewerServed(params = {}) {
+    const key = viewerKey(params.user || params.uniqueId, params.uniqueId);
+    const viewer = viewerSessions.get(key);
+    if (!viewer) return { ok: false, reason: 'Unknown viewer' };
+    const orderId = String(params.orderId || '');
+    const before = viewer.orders.length;
+    if (orderId) {
+      viewer.orders = viewer.orders.filter((order) => order.id !== orderId);
+      if (viewer.orders.length === before) {
+        return { ok: false, reason: 'Order already served', pendingOrders: viewer.orders.length };
+      }
+    } else {
+      // Legacy actions enqueue without sending an id to the stage.
+      viewer.orders.shift();
+    }
+    recordViewerStats(viewer, { drinks: 1 });
+    liveSession.served += 1;
+    return { ok: true, pendingOrders: viewer.orders.length, viewer: viewerSnapshot(viewer) };
+  },
+
+  viewerRoster() {
+    return {
+      session: {
+        id: liveSession.id,
+        startedAt: liveSession.startedAt,
+        coins: round2(liveSession.coins),
+        drinks: liveSession.drinks,
+        served: liveSession.served
+      },
+      limits: VIEWER_LIMITS,
+      viewers: activeViewers().map((viewer, index) => viewerSnapshot(viewer, index)),
+      leaderboard: getLeaderboard(8),
+      lifetimeLeaderboard: getLifetimeLeaderboard(8)
+    };
   },
 
   newGuest(params = {}) {
@@ -1195,6 +1583,8 @@ const Actions = {
     state.recentGifts = [];
     state.supporters = {};
     state.recentEvents = [];
+    viewerSessions.clear();
+    startLiveSession();
     saveState();
     broadcastNotification('shop.reset', { soft: false });
     broadcastNotification('temple.state', getPublicState());
@@ -1351,7 +1741,7 @@ async function connectTikTokLive(usernameOrUrl) {
 
   tiktokConn.on(WebcastEvent.MEMBER, (data) => {
     const { user, uniqueId, avatar } = extractUserFromEvent(data);
-    Actions.newGuest({ user, uniqueId, avatar });
+    Actions.viewerJoin({ user, uniqueId, avatar });
   });
 
   tiktokConn.on(WebcastEvent.CHAT, (data) => {
@@ -1618,6 +2008,22 @@ async function handleRpcCall(method, params = {}) {
 
     case 'shop.giftMap':
       return coinMenuEntries();
+
+    case 'shop.join':
+    case 'live.join':
+      return Actions.viewerJoin(params);
+
+    case 'shop.leave':
+    case 'live.leave':
+      return Actions.viewerLeave(params);
+
+    case 'shop.viewerServed':
+    case 'live.viewerServed':
+      return Actions.viewerServed(params);
+
+    case 'shop.viewers':
+    case 'live.viewers':
+      return Actions.viewerRoster();
 
     case 'live.connect':
       return await connectTikTokLive(params.username);

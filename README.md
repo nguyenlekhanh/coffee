@@ -168,6 +168,32 @@ All images come from the four existing folders — `public/assets/background`, `
 
 `public/js/asset-manifest.js` is generated from the actual directory contents. If you add or rename art later, regenerate it so the filenames stay byte-exact.
 
+## 👥 Viewer Character System
+
+One TikTok viewer = one persistent game character for the whole live session.
+
+- **Join** (`WebcastEvent.MEMBER` / `shop.join`): creates a character with a random
+  customer sprite and shows the TikTok username above it. Repeated joins, follows,
+  likes, comments and gifts never create a second character — the viewer is keyed by
+  `uniqueId` (falling back to the sanitized name).
+- **Follow**: VIP badge (crown) plus a celebration burst. **Like**: hearts and a waving
+  animation. **Comment**: a speech bubble over the character. **Gift**: a drink order
+  added to that viewer's personal queue (never a new body).
+- **Multiple donations**: each valid coin tier appends an order; the character serves
+  them one after another at the counter, showing the drink and its coin value. Combo
+  replays are deduplicated by order id.
+- **Limits**: 12 characters on stage, 5 visible waiting slots. Extra viewers wait in a
+  virtual queue off stage; viewers with paid orders are prioritised. When every table
+  is taken, the order becomes takeaway.
+- **Leave**: the current serving animation finishes, the character waves goodbye and
+  walks off screen. The session is kept for 15 minutes so a reconnecting viewer gets
+  the same character back (`shop.leave` / `shop.join`).
+- **Leaderboard**: coins per viewer for the current live session (top supporters on
+  stage), with all-time totals kept separately (`lifetimeLeaderboard`).
+- RPC: `shop.join`, `shop.leave`, `shop.viewerServed`, `shop.viewers` (aliases under
+  `live.*`). `GET /api/state` exposes `viewers`, `viewerSummary`, `session`,
+  `leaderboard` and `lifetimeLeaderboard`.
+
 ## 🎵 Background Music Playlist
 
 `public/js/music.js` (`ShopMusicPlayer`) owns the background playlist; `public/js/audio.js` delegates all music playback to it and keeps the synthesized ambience only as a fallback. Music volume is independent from the Piper voice volume and is remembered in `localStorage` (`shop_music_vol`) together with the last track (`shop_music_track`).

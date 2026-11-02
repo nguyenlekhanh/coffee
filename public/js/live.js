@@ -53,6 +53,17 @@
     audio.playRegister();
     updateHud();
   };
+  // Tell the server which personal order was just handed over, so the viewer's
+  // queue stays accurate across reconnects.
+  game.onOrderServed = (info) => {
+    if (!info || !info.viewerId) return;
+    callRpc('shop.viewerServed', {
+      user: info.name,
+      uniqueId: info.uniqueId,
+      orderId: info.orderId,
+      count: 1
+    });
+  };
   game.load().then(updateHud);
 
   // --------------------------------------------------------------------- HUD
@@ -230,6 +241,7 @@
     if (st.coinMenu) {
       renderCoinMenu(st.coinMenu);
     }
+    if (st.viewers) game.syncViewers(st.viewers);
     renderLeaderboard(st.leaderboard);
     renderFeed(st.recentEvents);
     setLiveStatus(st);
@@ -323,7 +335,12 @@
         showGiftBanner(ev);
         break;
       case 'newGuest':
+      case 'viewerJoin':
+      case 'viewerReconnect':
         audio.playCupClink();
+        break;
+      case 'viewerLeave':
+        audio.playServiceBell();
         break;
       default:
         break;
@@ -446,6 +463,20 @@
     callRpc('shop.giftOrder', { user: viewerName(), giftId: 'rose', units: 1 });
     setDockStatus('Rose gift sent — a drink order is queued.');
   }
+  function viewerIdFor(name) {
+    const slug = String(name || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '');
+    return slug || 'guest';
+  }
+  function triggerJoin() {
+    callRpc('shop.join', { user: viewerName(), uniqueId: viewerIdFor(viewerName()) });
+    setDockStatus('Viewer character joined the shop.');
+  }
+  function triggerLeave() {
+    callRpc('shop.leave', { user: viewerName(), uniqueId: viewerIdFor(viewerName()) });
+    setDockStatus('Viewer is leaving the shop.');
+  }
   function triggerMystery() {
     callRpc('shop.mysteryDrink', { user: viewerName() });
     setDockStatus('Mystery sip drawn.');
@@ -456,6 +487,8 @@
   $('btnRpcComment')?.addEventListener('click', triggerComment);
   $('btnRpcGift')?.addEventListener('click', triggerGift);
   $('btnRpcMystery')?.addEventListener('click', triggerMystery);
+  $('btnRpcJoin')?.addEventListener('click', triggerJoin);
+  $('btnRpcLeave')?.addEventListener('click', triggerLeave);
 
   $('cardFollow')?.addEventListener('click', triggerFollow);
   $('cardLike')?.addEventListener('click', triggerLike);
