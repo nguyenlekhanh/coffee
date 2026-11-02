@@ -1,12 +1,12 @@
 {
-  "customersServed": 19,
-  "drinksSold": 19,
-  "totalTips": 80.75,
+  "customersServed": 28,
+  "drinksSold": 28,
+  "totalTips": 152.05,
   "likes": 9,
-  "follows": 2,
+  "follows": 4,
   "comments": 2,
-  "gifts": 6,
-  "totalCoins": 85,
+  "gifts": 8,
+  "totalCoins": 110,
   "recentGifts": [
     {
       "id": "gift_1793638358328_drua",
@@ -196,5 +196,1252 @@
       "speed": 1,
       "volume": 0.85
     }
+  },
+  "conversations": {
+    "settings": {
+      "enabled": true,
+      "running": true,
+      "interval": 30,
+      "shuffle": true,
+      "categories": {
+        "daily": true,
+        "drinks": true,
+        "menu": true,
+        "funny": true,
+        "teasing": true,
+        "greetings": true,
+        "busy": true,
+        "quiet": true,
+        "weather": true,
+        "weekend": true,
+        "supporter": true,
+        "atmosphere": true
+      },
+      "savedAt": "2026-11-02T17:38:29.259Z"
+    },
+    "list": [
+      {
+        "id": "daily_1",
+        "category": "daily",
+        "male": "Morning, Sarah! The ice machine is already humming. That's a good sign.",
+        "female": "Best sound in the shop! I take it as a personal compliment.",
+        "followUp": "Let's make today a busy one, then.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": true,
+        "createdAt": "2026-11-02T17:38:26.039Z"
+      },
+      {
+        "id": "daily_2",
+        "category": "daily",
+        "male": "Hey, quick question: are we a drink shop or a sunshine delivery service?",
+        "female": "Why not both? We hand out the sunshine in cups.",
+        "followUp": "That's going on the sign. Sunshine, with ice.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "daily_3",
+        "category": "daily",
+        "male": "I just organized the straws by color, and honestly? It's beautiful.",
+        "female": "You need a hobby, Marcus.",
+        "followUp": "I have a hobby. It's organizing straws.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "daily_4",
+        "category": "daily",
+        "male": "First customer of the day gets my famous welcome speech.",
+        "female": "Please don't do the robot again.",
+        "followUp": "Too late. The robot is happening.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "daily_5",
+        "category": "daily",
+        "male": "I think the syrup shelf is judging me.",
+        "female": "It's definitely the blue raspberry. It's been staring all morning.",
+        "followUp": "I'm moving it to the back.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "daily_6",
+        "category": "daily",
+        "male": "New day, fresh ice, same beautiful chaos.",
+        "female": "You say that like you did not forget to stock the cups.",
+        "followUp": "I stocked them. Eventually counts.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "drinks_1",
+        "category": "drinks",
+        "male": "What's your go-to right now? I need inspiration.",
+        "female": "Strawberry smoothie. Cold, creamy, and a little dramatic.",
+        "followUp": "Dramatic? It's a drink.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "drinks_2",
+        "category": "drinks",
+        "male": "I made a lemonade so fresh it slapped me.",
+        "female": "That's not how lemonade works.",
+        "followUp": "Tell that to my face. It's still recovering.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "drinks_3",
+        "category": "drinks",
+        "male": "If you could only drink one thing from the menu forever?",
+        "female": "Easy. Iced coffee. I have things to do.",
+        "followUp": "Everything except sleep, apparently.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "drinks_4",
+        "category": "drinks",
+        "male": "Blue slushie or berry smoothie? Settle this for me.",
+        "female": "Slushie for the vibes, smoothie for the actual fruit.",
+        "followUp": "So both. Got it.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "drinks_5",
+        "category": "drinks",
+        "male": "I'm testing a new combo: orange soda with a splash of lemonade.",
+        "female": "That sounds either genius or a science experiment.",
+        "followUp": "Those are my two favorite categories.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "menu_1",
+        "category": "menu",
+        "male": "Somebody asked if we have anything warm.",
+        "female": "We have a warm personality and a hot coffee machine.",
+        "followUp": "I'll put that on the menu.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "menu_2",
+        "category": "menu",
+        "male": "We should rename the mystery drink 'Trust Me.'",
+        "female": "Absolutely not. People will think it's a dare.",
+        "followUp": "It is a dare. That's the fun part.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "menu_3",
+        "category": "menu",
+        "male": "The menu board looks crooked again.",
+        "female": "It's not crooked. It's leaning into the summer theme.",
+        "followUp": "You're a genius.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "menu_4",
+        "category": "menu",
+        "male": "Do we have a drink for somebody who cannot decide?",
+        "female": "That is what the mystery sip was invented for.",
+        "followUp": "One mystery sip, coming right up.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "menu_5",
+        "category": "menu",
+        "male": "I counted the menu twice and got two different numbers.",
+        "female": "That is because you counted the pictures as drinks.",
+        "followUp": "The pictures are very convincing.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "funny_1",
+        "category": "funny",
+        "male": "I tried to take a nap behind the counter, but the blender had opinions.",
+        "female": "The blender is the real manager.",
+        "followUp": "Then I want a raise.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "funny_2",
+        "category": "funny",
+        "male": "A customer asked if our ice is organic.",
+        "female": "What did you tell them?",
+        "followUp": "I said it's locally frozen.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "funny_3",
+        "category": "funny",
+        "male": "I dropped a cup earlier and it bounced.",
+        "female": "We should not be proud of that.",
+        "followUp": "Too late. I'm telling everyone.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "funny_4",
+        "category": "funny",
+        "male": "Why does the register beep so aggressively?",
+        "female": "It's excited about money.",
+        "followUp": "Same, honestly.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "funny_5",
+        "category": "funny",
+        "male": "I named the mop Kevin.",
+        "female": "Of course you did. Does Kevin get a break?",
+        "followUp": "Kevin gets one bucket a day.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "funny_6",
+        "category": "funny",
+        "male": "The health inspector asked if I have a system.",
+        "female": "Please tell me you said yes.",
+        "followUp": "I said the ice knows where it belongs.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "teasing_1",
+        "category": "teasing",
+        "male": "You've been humming the same song for an hour.",
+        "female": "It's a good song!",
+        "followUp": "It was. Twenty minutes ago.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "teasing_2",
+        "category": "teasing",
+        "male": "Sarah says my drinks are 'a little sweet.'",
+        "female": "I said that with love.",
+        "followUp": "You said it with a straw.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "teasing_3",
+        "category": "teasing",
+        "male": "I'm the fastest pour in the shop.",
+        "female": "You're the fastest spill.",
+        "followUp": "That was one time.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "teasing_4",
+        "category": "teasing",
+        "male": "You always take the last cherry.",
+        "female": "Because I'm the closer. Closers get cherries.",
+        "followUp": "That's not in the handbook.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "teasing_5",
+        "category": "teasing",
+        "male": "I fixed the shelf.",
+        "female": "You put a book under it.",
+        "followUp": "A very stable book.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "greetings_1",
+        "category": "greetings",
+        "male": "Welcome in! You picked a good time. The ice is fresh.",
+        "female": "And the music is questionable, but the drinks are great.",
+        "followUp": "Hey. I picked the music.",
+        "contexts": [
+          "newViewer",
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "greetings_2",
+        "category": "greetings",
+        "male": "New faces at the counter! Come say hi in the chat.",
+        "female": "We don't bite. We do hand out samples.",
+        "followUp": "Only if you ask nicely.",
+        "contexts": [
+          "newViewer",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "greetings_3",
+        "category": "greetings",
+        "male": "Hey @{viewer}! Welcome to the sunny side.",
+        "female": "We saved you a spot and a straw.",
+        "followUp": "The good straw. The bendy one.",
+        "contexts": [
+          "newViewer",
+          "quiet"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "greetings_4",
+        "category": "greetings",
+        "male": "Good to see you again, friends.",
+        "female": "Same seats, same sunshine, fresh drinks.",
+        "followUp": "We even cleaned the counter.",
+        "contexts": [
+          "newViewer",
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "greetings_5",
+        "category": "greetings",
+        "male": "If this is your first time here, welcome.",
+        "female": "If it's not, welcome back. We missed you.",
+        "followUp": "Both work. Both get a drink.",
+        "contexts": [
+          "newViewer",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "greetings_6",
+        "category": "greetings",
+        "male": "Look who just walked in! @{viewer}, welcome.",
+        "female": "Perfect timing. We were just talking about drinks.",
+        "followUp": "We are always talking about drinks.",
+        "contexts": [
+          "newViewer",
+          "quiet"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "busy_1",
+        "category": "busy",
+        "male": "Whoa, the queue is moving! I need backup.",
+        "female": "Backup is here. I brought ice and attitude.",
+        "followUp": "Perfect. We need both.",
+        "contexts": [
+          "busy"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "busy_2",
+        "category": "busy",
+        "male": "Three orders at once. Stay with me, Sarah.",
+        "female": "I've got the smoothies. You take the coffees.",
+        "followUp": "Teamwork makes the drinks work.",
+        "contexts": [
+          "busy"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "busy_3",
+        "category": "busy",
+        "male": "We're getting slammed, and I love it.",
+        "female": "Tell your face that. You look terrified.",
+        "followUp": "This is my excited face.",
+        "contexts": [
+          "busy"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "busy_4",
+        "category": "busy",
+        "male": "Order up, order up! Who had the lemonade?",
+        "female": "That one's mine. Coming through!",
+        "followUp": "Careful. The straw is armed.",
+        "contexts": [
+          "busy"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "busy_5",
+        "category": "busy",
+        "male": "Everybody stay patient, we're getting to every order.",
+        "female": "We're working as fast as the blender allows.",
+        "followUp": "The blender is doing its best.",
+        "contexts": [
+          "busy"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "quiet_1",
+        "category": "quiet",
+        "male": "It's quiet. Too quiet.",
+        "female": "You're about to do something weird, aren't you?",
+        "followUp": "I was thinking a karaoke hour.",
+        "contexts": [
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "quiet_2",
+        "category": "quiet",
+        "male": "Slow afternoon. Should we wipe the counter?",
+        "female": "We wiped it four minutes ago.",
+        "followUp": "Then we wipe it with purpose.",
+        "contexts": [
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "quiet_3",
+        "category": "quiet",
+        "male": "I can hear the fridge. That's how quiet it is.",
+        "female": "Let's give the chat something to talk about.",
+        "followUp": "I'll start. Favorite drink, anyone?",
+        "contexts": [
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "quiet_4",
+        "category": "quiet",
+        "male": "Quiet shop, fresh ice, no line.",
+        "female": "This is the calm before the smoothie storm.",
+        "followUp": "I'll hold onto the counter.",
+        "contexts": [
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "quiet_5",
+        "category": "quiet",
+        "male": "Should we practice our customer service smile?",
+        "female": "Mine is already perfect.",
+        "followUp": "Mine looks like I'm thinking about pizza.",
+        "contexts": [
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "quiet_6",
+        "category": "quiet",
+        "male": "What do you want to drink today, chat?",
+        "female": "Pick something cold. It is a beautiful day for ice.",
+        "followUp": "And for a little friendly peer pressure.",
+        "contexts": [
+          "quiet",
+          "empty"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weather_1",
+        "category": "weather",
+        "male": "It is officially hot enough to fry an egg on the sidewalk.",
+        "female": "Let's not test that. Let's make lemonade instead.",
+        "followUp": "Science can wait. Lemonade can't.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weather_2",
+        "category": "weather",
+        "male": "Another scorcher out there. People need cold drinks.",
+        "female": "And a little shade, and maybe a nap.",
+        "followUp": "We sell two of those.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weather_3",
+        "category": "weather",
+        "male": "The sun is doing the absolute most today.",
+        "female": "That's why we're the sunny side. We planned for this.",
+        "followUp": "Somebody plan me a fan.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weather_4",
+        "category": "weather",
+        "male": "Summer is here, and the slushie machine knows it.",
+        "female": "It's been showing off all morning.",
+        "followUp": "Let it. It earned it.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weather_5",
+        "category": "weather",
+        "male": "Hot day, cold drink, good music. That is the whole plan.",
+        "female": "You forgot friendly service.",
+        "followUp": "I was getting to that.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weekend_1",
+        "category": "weekend",
+        "male": "It's the weekend! You know what that means.",
+        "female": "Long lines and extra cherries?",
+        "followUp": "You read my mind.",
+        "contexts": [
+          "weekend",
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weekend_2",
+        "category": "weekend",
+        "male": "Saturday energy in the shop today.",
+        "female": "Saturdays get the good ice.",
+        "followUp": "Every day gets the good ice. Don't tell the other days.",
+        "contexts": [
+          "weekend",
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weekend_3",
+        "category": "weekend",
+        "male": "Weekend plans? Mine is making drinks and listening to you talk.",
+        "female": "That's not a plan, that's a job.",
+        "followUp": "Best job I've had.",
+        "contexts": [
+          "weekend",
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weekend_4",
+        "category": "weekend",
+        "male": "Sunday is for slow sips and good company.",
+        "female": "And for pretending Monday isn't coming.",
+        "followUp": "We don't say that word here.",
+        "contexts": [
+          "weekend",
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "weekend_5",
+        "category": "weekend",
+        "male": "The weekend crowd is always ready to try something new.",
+        "female": "So let them try the weird combo.",
+        "followUp": "The people asked. We deliver.",
+        "contexts": [
+          "weekend",
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "supporter_1",
+        "category": "supporter",
+        "male": "Shout out to everyone who followed today. You are the best.",
+        "female": "Every follow puts a little sparkle in the shop.",
+        "followUp": "We see you. We appreciate you.",
+        "contexts": [
+          "any",
+          "supporter"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "supporter_2",
+        "category": "supporter",
+        "male": "Somebody just sent a gift, and the whole counter lit up.",
+        "female": "That is the good stuff. Thank you from both of us.",
+        "followUp": "We will make the next drink extra special.",
+        "contexts": [
+          "gift",
+          "supporter"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "supporter_3",
+        "category": "supporter",
+        "male": "Look at our supporters go! This shop runs on good people.",
+        "female": "And a surprising amount of ice.",
+        "followUp": "Mostly good people, though.",
+        "contexts": [
+          "any",
+          "supporter"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "supporter_4",
+        "category": "supporter",
+        "male": "Whoa! Did everybody see that? {viewer} just went all in!",
+        "female": "We saw it! That calls for a victory lap around the blender.",
+        "followUp": "Make it two laps. And an extra-large smoothie!",
+        "contexts": [
+          "bigGift",
+          "gift"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "supporter_5",
+        "category": "supporter",
+        "male": "Hold up. {viewer} just dropped a legendary gift!",
+        "female": "Legendary! Somebody give that supporter a front-row stool.",
+        "followUp": "Already saving it. Best seat in the shop!",
+        "contexts": [
+          "bigGift",
+          "gift"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "atmosphere_1",
+        "category": "atmosphere",
+        "male": "I love this little shop. The music, the ice, the chaos.",
+        "female": "It's home. With more straws.",
+        "followUp": "That's going on a mug.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "atmosphere_2",
+        "category": "atmosphere",
+        "male": "Smell that? Fresh lemon and clean counter.",
+        "female": "We should bottle that.",
+        "followUp": "We bottle the lemon. The counter stays.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "atmosphere_3",
+        "category": "atmosphere",
+        "male": "The afternoon light in here is perfect.",
+        "female": "You're getting sentimental.",
+        "followUp": "It's the syrup fumes.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "atmosphere_4",
+        "category": "atmosphere",
+        "male": "This is my favorite part of the day, right before the rush.",
+        "female": "You say that before every rush.",
+        "followUp": "It's always true.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "atmosphere_5",
+        "category": "atmosphere",
+        "male": "Good drinks, good people, good music. Not a bad way to spend a day.",
+        "female": "And the best coworker.",
+        "followUp": "I wasn't going to say it, but yes.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      },
+      {
+        "id": "atmosphere_6",
+        "category": "atmosphere",
+        "male": "Listen to the ice settle. This shop has a soundtrack.",
+        "female": "You are one cup away from writing poetry.",
+        "followUp": "One cup and a very small notebook.",
+        "contexts": [
+          "any"
+        ],
+        "enabled": true,
+        "custom": false,
+        "edited": false,
+        "createdAt": null
+      }
+    ],
+    "history": [
+      {
+        "runId": "run_1793641652502_pziu",
+        "conversationId": "busy_1",
+        "category": "busy",
+        "status": "started",
+        "startedAt": "2026-11-02T17:47:32.502Z",
+        "endedAt": null,
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Whoa, the queue is moving! I need backup."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Backup is here. I brought ice and attitude."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Perfect. We need both."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641609363_mfgx",
+        "conversationId": "drinks_1",
+        "category": "drinks",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:46:49.363Z",
+        "endedAt": "2026-11-02T17:47:01.864Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "What's your go-to right now? I need inspiration."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Strawberry smoothie. Cold, creamy, and a little dramatic."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Dramatic? It's a drink."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641568355_x3yr",
+        "conversationId": "atmosphere_1",
+        "category": "atmosphere",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:46:08.355Z",
+        "endedAt": "2026-11-02T17:46:19.362Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I love this little shop. The music, the ice, the chaos."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "It's home. With more straws."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "That's going on a mug."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641524360_zwo5",
+        "conversationId": "drinks_4",
+        "category": "drinks",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:45:24.360Z",
+        "endedAt": "2026-11-02T17:45:37.357Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Blue slushie or berry smoothie? Settle this for me."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Slushie for the vibes, smoothie for the actual fruit."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "So both. Got it."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641483361_nl37",
+        "conversationId": "greetings_4",
+        "category": "greetings",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:44:43.361Z",
+        "endedAt": "2026-11-02T17:44:54.356Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Good to see you again, friends."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Same seats, same sunshine, fresh drinks."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "We even cleaned the counter."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641439862_cdec",
+        "conversationId": "greetings_1",
+        "category": "greetings",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:43:59.862Z",
+        "endedAt": "2026-11-02T17:44:12.867Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Welcome in! You picked a good time. The ice is fresh."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "And the music is questionable, but the drinks are great."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Hey. I picked the music."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641400358_bclh",
+        "conversationId": "atmosphere_3",
+        "category": "atmosphere",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:43:20.358Z",
+        "endedAt": "2026-11-02T17:43:29.862Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "The afternoon light in here is perfect."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You're getting sentimental."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "It's the syrup fumes."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641357868_ba9p",
+        "conversationId": "daily_4",
+        "category": "daily",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:42:37.868Z",
+        "endedAt": "2026-11-02T17:42:49.857Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "First customer of the day gets my famous welcome speech."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "Please don't do the robot again."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "Too late. The robot is happening."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641316368_6eq8",
+        "conversationId": "greetings_3",
+        "category": "greetings",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:41:56.368Z",
+        "endedAt": "2026-11-02T17:42:06.869Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Hey @everybody! Welcome to the sunny side."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "We saved you a spot and a straw."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "The good straw. The bendy one."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641275858_7rbx",
+        "conversationId": "weekend_4",
+        "category": "weekend",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:41:15.858Z",
+        "endedAt": "2026-11-02T17:41:26.361Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Sunday is for slow sips and good company."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "And for pretending Monday isn't coming."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "We don't say that word here."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641232360_7bg2",
+        "conversationId": "daily_3",
+        "category": "daily",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:40:32.360Z",
+        "endedAt": "2026-11-02T17:40:44.871Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "I just organized the straws by color, and honestly? It's beautiful."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "You need a hobby, Marcus."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I have a hobby. It's organizing straws."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641182370_0ys2",
+        "conversationId": "menu_1",
+        "category": "menu",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:39:42.370Z",
+        "endedAt": "2026-11-02T17:40:01.363Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Somebody asked if we have anything warm."
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "We have a warm personality and a hot coffee machine."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "I'll put that on the menu."
+          }
+        ]
+      },
+      {
+        "runId": "run_1793641141359_64wy",
+        "conversationId": "menu_4",
+        "category": "menu",
+        "status": "completed",
+        "startedAt": "2026-11-02T17:39:01.359Z",
+        "endedAt": "2026-11-02T17:39:12.364Z",
+        "lines": [
+          {
+            "speaker": "maleSeller",
+            "text": "Do we have a drink for somebody who cannot decide?"
+          },
+          {
+            "speaker": "femaleSeller",
+            "text": "That is what the mystery sip was invented for."
+          },
+          {
+            "speaker": "maleSeller",
+            "text": "One mystery sip, coming right up."
+          }
+        ]
+      }
+    ]
   }
 }

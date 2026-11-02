@@ -59,6 +59,23 @@
       })
     : null;
   window.shopAnnouncer = announcer;
+
+  // Two-seller conversations: one stage scheduler, one line at a time.
+  const conversations = window.ShopConversationEngine
+    ? new window.ShopConversationEngine({
+        audio,
+        announcer,
+        getContext: () => ({
+          stats: {
+            customers: game.customers ? game.customers.length : 0,
+            waiting: game.queue ? game.queue.length : 0,
+            serving: Boolean(game.servingId)
+          },
+          viewers: game.viewers ? game.viewers.size : 0
+        })
+      })
+    : null;
+  window.shopConversations = conversations;
   window.addEventListener('error', (e) => console.error('[ShopError]', e.message));
 
   let rpcId = 1;
@@ -425,6 +442,9 @@
       if (announcer && st.tts) announcer.setVoiceCatalog(st.tts.catalog || st.tts.voices);
       if (announcer && st.voiceProfiles) announcer.setVoiceProfiles(st.voiceProfiles);
       if (announcer) announcer.setPaused(Boolean(st.settings.paused) || st.settings.running === false);
+      if (conversations && st.voiceProfiles) conversations.setVoiceProfiles(st.voiceProfiles);
+      if (conversations && st.conversations) conversations.applySnapshot(st.conversations);
+      if (conversations) conversations.setPaused(Boolean(st.settings.paused) || st.settings.running === false);
       const ttsBtn = $('btnToggleTts');
       if (ttsBtn) {
         ttsBtn.textContent = `🎙️ Voice: ${audio.ttsEnabled ? 'ON' : 'OFF'}`;
@@ -520,6 +540,16 @@
     if (ev.test) {
       handleTestEvent(ev);
       return;
+    }
+    if (conversations) {
+      if (ev.type === 'giftOrder' || ev.type === 'partyOrder') conversations.notifyGift(ev);
+      else if (ev.type === 'followGuest' || ev.type === 'freeDrink' || ev.type === 'mysteryDrink') {
+        conversations.notifyPriority(ev.type === 'followGuest' || ev.type === 'freeDrink' ? 'vip' : 'gift');
+      } else if (ev.type === 'viewerJoin') {
+        conversations.notifyViewerJoin(ev.user);
+      } else if (ev.type === 'serveDrink') {
+        conversations.notifyServed(ev);
+      }
     }
     game.handleEvent(ev);
     if (
@@ -655,6 +685,7 @@
         handleServerEvent({ type: 'newGuest', user: 'Walk-in guest' });
       } else if (msg.method === 'tts.play') {
         if (msg.params && msg.params.url) {
+          if (conversations) conversations.notifyPriority('viewer');
           audio.enqueueTts(msg.params.text || 'Welcome to Sunny Side Sips!', {
             voice: msg.params.voice,
             language: msg.params.language,

@@ -217,6 +217,7 @@
       this.lastPersonalizedAt = 0;
       this.pendingGreet = null;
       this.paused = false;
+      this.conversationActive = false;
       this.timer = null;
       this.lastBroadcastAt = 0;
       this.channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('sunny-side-announcer') : null;
@@ -322,6 +323,13 @@
       this.broadcast(true);
     }
 
+    // A two-seller conversation owns the speech slot until it finishes, so the
+    // automatic announcement catalog cannot talk over the other seller.
+    setConversationActive(active) {
+      this.conversationActive = Boolean(active);
+      this.broadcast(true);
+    }
+
     start() {
       this.saveSettings({ running: true });
     }
@@ -414,6 +422,7 @@
     tick() {
       if (!this.audio) return;
       if (!this.settings.enabled || !this.settings.running || this.paused) return;
+      if (this.conversationActive) return;
       const now = Date.now();
       const intervalMs = Math.max(3, Number(this.settings.interval) || 6) * 1000;
       if (this.lastStartAt && now - this.lastStartAt < intervalMs) return;
@@ -492,6 +501,7 @@
         enabled: this.settings.enabled,
         running: this.settings.running,
         paused: this.paused,
+        conversationActive: this.conversationActive,
         interval: this.settings.interval,
         language: this.settings.language,
         voiceMode: this.settings.voiceMode,

@@ -151,6 +151,36 @@
     .vp-test-row .btn { flex: 0 0 auto; padding: 6px 9px; font-size: 12px; }
     .vp-hint { font-size: 11px; line-height: 1.3; color: var(--ink-soft); font-weight: 600; }
     .vp-meta { font-size: 10.5px; letter-spacing: 0.2px; color: var(--ink-soft); font-weight: 700; text-align: right; }
+    .conv-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; font-weight: 800; color: var(--ink-soft); }
+    .conv-status strong { color: var(--ink); }
+    .conv-cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    @media (max-width: 780px) { .conv-cats { grid-template-columns: 1fr 1fr; } }
+    .conv-cat { display: flex; align-items: center; gap: 6px; background: #fff; border: 2px solid rgba(59, 42, 32, 0.25); border-radius: 9px; padding: 6px 8px; font-size: 12px; font-weight: 700; }
+    .conv-cat input { accent-color: var(--coral); }
+    .conv-cat .hint { margin-left: auto; font-size: 10.5px; }
+    .conv-list { display: flex; flex-direction: column; gap: 6px; max-height: 480px; overflow-y: auto; padding-right: 4px; }
+    .conv-row { background: #fff; border: 2px solid rgba(59, 42, 32, 0.28); border-radius: 10px; padding: 8px 10px; }
+    .conv-row.disabled { opacity: 0.55; }
+    .conv-row-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .conv-row-head .conv-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; color: var(--ink-soft); }
+    .conv-row-head .ann-cat { margin-bottom: 0; }
+    .conv-row-head .conv-actions { margin-left: auto; display: flex; gap: 4px; }
+    .conv-row-head .conv-actions .btn { padding: 3px 7px; font-size: 11px; }
+    .conv-line { font-size: 12.5px; font-weight: 700; line-height: 1.35; margin-top: 3px; }
+    .conv-line strong { color: var(--coral-dark); }
+    .conv-line.follow { color: var(--ink-soft); font-weight: 600; }
+    .conv-editor { display: none; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .conv-row.editing .conv-editor { display: flex; }
+    .conv-row.editing .conv-body { display: none; }
+    .conv-editor textarea { min-height: 54px; font-family: inherit; font-size: 12.5px; }
+    .conv-history { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; }
+    .conv-hist-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; background: #fff; border: 2px solid rgba(59, 42, 32, 0.2); border-radius: 9px; padding: 6px 8px; font-size: 12px; font-weight: 700; }
+    .conv-hist-row .hint { margin-left: auto; }
+    .conv-hist-status.completed { color: #1f7a3d; }
+    .conv-hist-status.interrupted { color: var(--coral-dark); }
+    details.conv-add { background: #fff; border: 2px dashed rgba(59, 42, 32, 0.35); border-radius: 10px; padding: 9px 11px; }
+    details.conv-add summary { cursor: pointer; font-weight: 800; font-size: 13px; }
+    details.conv-add[open] summary { margin-bottom: 8px; }
     .tt-state {
       display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.8px;
       padding: 4px 10px; border-radius: 8px; background: rgba(59, 42, 32, 0.12); color: var(--ink-soft);
@@ -285,6 +315,70 @@
         <div class="vp-grid" id="vpGrid"></div>
         <audio id="vpAudio" controls style="width: 100%; height: 38px;"></audio>
         <div class="hint" id="vpPitchNote">Pitch is not supported by the installed Piper engine.</div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>💬 SELLER CONVERSATION SYSTEM</h2>
+        <div class="row">
+          <button class="btn on" id="btnConvToggle">Conversations: ON</button>
+          <button class="btn" id="btnConvStartStop">⏸ Stop</button>
+          <div>
+            <div class="label-line"><span>Conversation interval</span></div>
+            <select id="convInterval"></select>
+          </div>
+          <button class="btn on" id="btnConvShuffle">🔀 Shuffle: ON</button>
+          <button class="btn gold" id="btnConvTest">🎧 Test Conversation</button>
+          <button class="btn danger" id="btnConvRestore">↺ Restore Default Conversations</button>
+        </div>
+        <div class="conv-status">
+          <span class="pill" id="convState">Loading…</span>
+          <span>Currently speaking: <strong id="convNow">—</strong></span>
+          <span>Next conversation: <strong id="convNext">—</strong></span>
+          <span id="convCount" class="hint"></span>
+        </div>
+        <audio id="convAudio" controls style="width: 100%; height: 38px;"></audio>
+        <div class="hint" id="convHint">The scheduler runs on the live stage and speaks one line at a time through the shared Piper queue. Gifts, VIP lines and viewer replies always go first.</div>
+        <div class="row">
+          <button class="btn" id="btnConvPreviewMale">🧑‍🍳 Male Seller preview</button>
+          <button class="btn" id="btnConvPreviewFemale">👩‍🍳 Female Seller preview</button>
+          <span class="hint" id="convPreviewHint">Previews use the current 🎭 profile voice, speed and volume.</span>
+        </div>
+        <div class="label-line"><span>Conversation categories</span><span class="hint">Disabled categories are never scheduled</span></div>
+        <div class="conv-cats" id="convCategories"></div>
+        <div class="label-line"><span>Conversation manager</span><span class="hint" id="convManagerCount"></span></div>
+        <div class="row">
+          <input type="text" id="convSearch" placeholder="Search dialogue, ID or category…" />
+          <select id="convFilter"><option value="">All categories</option></select>
+        </div>
+        <div class="conv-list" id="convList"></div>
+        <details class="conv-add">
+          <summary>➕ Add a conversation</summary>
+          <div class="row">
+            <div>
+              <div class="label-line"><span>Category</span></div>
+              <select id="convAddCategory"></select>
+            </div>
+            <div>
+              <div class="label-line"><span>Contexts (optional)</span></div>
+              <input type="text" id="convAddContexts" placeholder="any, quiet, busy…" />
+            </div>
+          </div>
+          <div class="label-line"><span>🧑‍🍳 Male Seller</span></div>
+          <textarea id="convAddMale" placeholder="Male Seller line"></textarea>
+          <div class="label-line"><span>👩‍🍳 Female Seller</span></div>
+          <textarea id="convAddFemale" placeholder="Female Seller response"></textarea>
+          <div class="label-line"><span>Follow-up (optional)</span></div>
+          <textarea id="convAddFollow" placeholder="Optional follow-up line"></textarea>
+          <div class="row">
+            <button class="btn gold" id="btnConvAdd">Add conversation</button>
+            <span class="hint" id="convAddHint"></span>
+          </div>
+        </details>
+        <div class="label-line">
+          <span>Conversation history</span>
+          <button class="btn" id="btnConvClearHistory">Clear history</button>
+        </div>
+        <div class="conv-history" id="convHistory"><div class="hint">No conversations recorded yet.</div></div>
       </section>
 
       <section class="card" style="grid-column: 1 / -1">
@@ -904,6 +998,7 @@
           : 'Running · the queue, tables and drink service are simulated in the browser.';
 
         renderTikTokStatus(st);
+        if (st.conversations) renderConversations(st.conversations);
 
         if (st.tts) {
           document.getElementById('ttsLanguage').value = st.settings.ttsLanguage || 'en';
@@ -1292,6 +1387,469 @@
           if (result && result.voiceProfiles) renderVoiceProfiles(result.voiceProfiles);
         };
       }
+    })();
+
+    // ------------------------------------------------- seller conversations
+    let conversationState = null;
+    let convListSignature = '';
+    let convCategorySignature = '';
+    let convHistorySignature = '';
+    let convTestToken = 0;
+
+    const CONV_SPEAKER_LABELS = { maleSeller: '🧑‍🍳 Male Seller', femaleSeller: '👩‍🍳 Female Seller' };
+
+    function convCategory(id) {
+      const list = (conversationState && conversationState.categories) || [];
+      return list.find((category) => category.id === id) || { id, label: id, icon: '💬' };
+    }
+
+    function convCategoryLabel(id) {
+      const category = convCategory(id);
+      return `${category.icon || '💬'} ${category.label || id}`;
+    }
+
+    function convSpeakerLabel(id) {
+      return CONV_SPEAKER_LABELS[id] || '—';
+    }
+
+    function renderConvStatus() {
+      if (!conversationState) return;
+      const settings = conversationState.settings || {};
+      const runtime = conversationState.runtime || {};
+      const stateEl = document.getElementById('convState');
+      const nowEl = document.getElementById('convNow');
+      const nextEl = document.getElementById('convNext');
+      const countEl = document.getElementById('convCount');
+      if (countEl) {
+        countEl.textContent = `${conversationState.enabledTotal}/${conversationState.total} exchanges enabled · ${conversationState.defaultTotal} defaults`;
+      }
+      if (stateEl) {
+        stateEl.textContent = settings.enabled === false
+          ? 'DISABLED'
+          : settings.running === false
+            ? 'STOPPED'
+            : runtime.status === 'speaking'
+              ? 'SPEAKING'
+              : runtime.status === 'paused'
+                ? 'SHOP PAUSED'
+                : 'SCHEDULED';
+      }
+      if (nowEl) {
+        nowEl.textContent = runtime.currentSpeaker
+          ? convSpeakerLabel(runtime.currentSpeaker)
+          : runtime.phase === 'waiting'
+            ? 'pause between lines'
+            : '—';
+      }
+      if (nextEl) {
+        let text = '—';
+        if (settings.enabled === false) text = 'disabled';
+        else if (settings.running === false) text = 'stopped';
+        else if (runtime.status === 'paused') text = 'shop paused';
+        else if (runtime.status === 'speaking') text = 'speaking now';
+        else if (runtime.nextAt > 0) {
+          const seconds = Math.max(0, Math.ceil((runtime.nextAt - Date.now()) / 1000));
+          text = `in ${seconds}s`;
+        } else if (!runtime.updatedAt) {
+          text = 'waiting for stage';
+        }
+        nextEl.textContent = text;
+      }
+    }
+
+    function renderConvCategories() {
+      const grid = document.getElementById('convCategories');
+      if (!grid || !conversationState) return;
+      const categories = conversationState.categories || [];
+      const settings = conversationState.settings || {};
+      const signature = JSON.stringify(categories.map((category) => [category.id, category.count])) + JSON.stringify(settings.categories || {});
+      if (signature === convCategorySignature) return;
+      convCategorySignature = signature;
+      grid.innerHTML = categories
+        .map(
+          (category) =>
+            `<label class="conv-cat"><input type="checkbox" data-conv-cat="${escapeHtml(category.id)}" ${
+              settings.categories && settings.categories[category.id] !== false ? 'checked' : ''
+            } /> <span>${escapeHtml(category.icon || '💬')} ${escapeHtml(category.label)}</span><span class="hint">${Number(category.count) || 0}</span></label>`
+        )
+        .join('');
+
+      const filter = document.getElementById('convFilter');
+      if (filter) {
+        const value = filter.value;
+        filter.innerHTML =
+          '<option value="">All categories</option>' +
+          categories
+            .map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.label)} (${Number(category.count) || 0})</option>`)
+            .join('');
+        filter.value = [...filter.options].some((option) => option.value === value) ? value : '';
+      }
+      const add = document.getElementById('convAddCategory');
+      if (add) {
+        const value = add.value || 'daily';
+        add.innerHTML = categories
+          .map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.label)}</option>`)
+          .join('');
+        add.value = [...add.options].some((option) => option.value === value) ? value : 'daily';
+      }
+    }
+
+    function renderConvList(force = false) {
+      const list = document.getElementById('convList');
+      if (!list || !conversationState) return;
+      if (document.querySelector('#convList .conv-row.editing') && !force) return;
+      const search = String((document.getElementById('convSearch') || {}).value || '').trim().toLowerCase();
+      const filter = String((document.getElementById('convFilter') || {}).value || '');
+      const entries = conversationState.list || [];
+      const signature = JSON.stringify(entries.map((entry) => [entry.id, entry.enabled, entry.male, entry.female, entry.followUp, entry.category, entry.contexts]));
+      if (!force && signature === convListSignature && !search && !filter) return;
+      convListSignature = signature;
+
+      const visible = entries.filter((entry) => {
+        if (filter && entry.category !== filter) return false;
+        if (!search) return true;
+        return [entry.id, entry.category, entry.male, entry.female, entry.followUp, (entry.contexts || []).join(' ')]
+          .join(' ')
+          .toLowerCase()
+          .includes(search);
+      });
+      if (!visible.length) {
+        list.innerHTML = '<div class="hint" style="padding:10px">No conversations match that search or category.</div>';
+        return;
+      }
+      const categories = conversationState.categories || [];
+      const categoryOptions = categories
+        .map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.label)}</option>`)
+        .join('');
+      list.innerHTML = visible
+        .map((entry) => {
+          const contexts = Array.isArray(entry.contexts) ? entry.contexts.join(', ') : 'any';
+          return `
+          <div class="conv-row${entry.enabled === false ? ' disabled' : ''}" data-conv-id="${escapeHtml(entry.id)}">
+            <div class="conv-body">
+              <div class="conv-row-head">
+                <label class="hint"><input type="checkbox" data-conv-enable ${entry.enabled === false ? '' : 'checked'} /> enabled</label>
+                <span class="ann-cat">${escapeHtml(convCategoryLabel(entry.category))}</span>
+                <span class="conv-id">${escapeHtml(entry.id)}${entry.custom ? ' · custom' : entry.edited ? ' · edited' : ''}</span>
+                <span class="conv-actions">
+                  <button class="btn" data-conv-edit>✏️ Edit</button>
+                  <button class="btn danger" data-conv-delete>🗑</button>
+                </span>
+              </div>
+              <div class="conv-line"><strong>🧑‍🍳 M</strong> ${escapeHtml(entry.male)}</div>
+              <div class="conv-line"><strong>👩‍🍳 F</strong> ${escapeHtml(entry.female)}</div>
+              ${entry.followUp ? `<div class="conv-line follow"><strong>🧑‍🍳 M</strong> ${escapeHtml(entry.followUp)}</div>` : ''}
+              <div class="hint">Context: ${escapeHtml(contexts)}</div>
+            </div>
+            <div class="conv-editor">
+              <select data-conv-category>${categoryOptions}</select>
+              <textarea data-conv-male>${escapeHtml(entry.male)}</textarea>
+              <textarea data-conv-female>${escapeHtml(entry.female)}</textarea>
+              <textarea data-conv-follow placeholder="Optional follow-up line">${escapeHtml(entry.followUp || '')}</textarea>
+              <input type="text" data-conv-contexts value="${escapeHtml(contexts)}" placeholder="any, quiet, busy…" />
+              <div class="row">
+                <button class="btn gold" data-conv-save>💾 Save</button>
+                <button class="btn" data-conv-cancel>Cancel</button>
+              </div>
+            </div>
+          </div>`;
+        })
+        .join('');
+      for (const row of list.querySelectorAll('.conv-row')) {
+        const entry = entries.find((item) => item.id === row.dataset.convId);
+        const select = row.querySelector('[data-conv-category]');
+        if (entry && select) select.value = entry.category;
+      }
+      const count = document.getElementById('convManagerCount');
+      if (count) count.textContent = `${visible.length} shown · ${entries.length} total`;
+    }
+
+    function renderConvHistory() {
+      const box = document.getElementById('convHistory');
+      if (!box || !conversationState) return;
+      const history = conversationState.history || [];
+      const signature = JSON.stringify(history.map((entry) => [entry.runId, entry.status, entry.endedAt]));
+      if (signature === convHistorySignature) return;
+      convHistorySignature = signature;
+      if (!history.length) {
+        box.innerHTML = '<div class="hint">No conversations recorded yet.</div>';
+        return;
+      }
+      box.innerHTML = history
+        .slice(0, 12)
+        .map((entry) => {
+          const first = entry.lines && entry.lines[0] ? entry.lines[0].text : '';
+          const when = entry.startedAt ? new Date(entry.startedAt).toLocaleTimeString() : '';
+          return `<div class="conv-hist-row">
+            <strong>${escapeHtml(convCategoryLabel(entry.category))}</strong>
+            <span class="hint">${escapeHtml(String(first).slice(0, 90))}</span>
+            <span class="conv-hist-status ${escapeHtml(entry.status || '')}">${escapeHtml(entry.status || 'started')}</span>
+            <span class="hint">${escapeHtml(when)} · ${Array.isArray(entry.lines) ? entry.lines.length : 0} lines</span>
+          </div>`;
+        })
+        .join('');
+    }
+
+    function renderConversations(snapshot, force = false) {
+      if (!snapshot || !snapshot.settings) return;
+      conversationState = snapshot;
+      const settings = snapshot.settings;
+      const toggle = document.getElementById('btnConvToggle');
+      if (toggle) {
+        toggle.textContent = `Conversations: ${settings.enabled === false ? 'OFF' : 'ON'}`;
+        toggle.classList.toggle('on', settings.enabled !== false);
+      }
+      const startStop = document.getElementById('btnConvStartStop');
+      if (startStop) startStop.textContent = settings.running === false ? '▶ Start' : '⏸ Stop';
+      const shuffle = document.getElementById('btnConvShuffle');
+      if (shuffle) {
+        shuffle.textContent = `🔀 Shuffle: ${settings.shuffle === false ? 'OFF' : 'ON'}`;
+        shuffle.classList.toggle('on', settings.shuffle !== false);
+      }
+      const interval = document.getElementById('convInterval');
+      if (interval) {
+        const values = snapshot.intervals || [20, 30, 45, 60, 90];
+        if (interval.options.length !== values.length) {
+          interval.innerHTML = values.map((value) => `<option value="${value}">${value} seconds</option>`).join('');
+        }
+        interval.value = String(settings.interval || 30);
+      }
+      renderConvCategories();
+      renderConvList(force);
+      renderConvHistory();
+      renderConvStatus();
+    }
+
+    async function applyConvSettings(patch) {
+      const hint = document.getElementById('convHint');
+      const data = await sendRpc('conversation.updateSettings', patch);
+      const result = data && data.result;
+      if (result && result.conversations) renderConversations(result.conversations, true);
+      if (hint) {
+        hint.textContent = result && result.ok
+          ? 'Conversation settings saved on the server.'
+          : 'Could not save conversation settings: ' + ((result && result.error) || (data && data.error && data.error.message) || 'unknown error');
+      }
+    }
+
+    function playConvClip(result) {
+      return new Promise((resolve) => {
+        const player = document.getElementById('convAudio');
+        if (!player || !result || !result.url) return resolve();
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          player.onended = null;
+          player.onerror = null;
+          resolve();
+        };
+        const timer = setTimeout(finish, 15000);
+        player.onended = finish;
+        player.onerror = finish;
+        player.src = result.url;
+        player.volume = Number.isFinite(Number(result.volume)) ? Math.max(0, Math.min(1, Number(result.volume))) : 0.9;
+        try {
+          const play = player.play();
+          if (play && typeof play.catch === 'function') play.catch(finish);
+        } catch (_) {
+          finish();
+        }
+      });
+    }
+
+    function firstConversationForTest() {
+      if (!conversationState) return null;
+      const categories = conversationState.settings.categories || {};
+      const usable = (conversationState.list || []).filter(
+        (entry) => entry.enabled !== false && categories[entry.category] !== false
+      );
+      return usable.find((entry) => entry.category === 'daily') || usable[0] || null;
+    }
+
+    async function playConversationPreview(profile, text, label) {
+      const hint = document.getElementById('convPreviewHint');
+      const token = ++convTestToken;
+      if (hint) hint.textContent = `Synthesizing ${label} through Piper…`;
+      const data = await sendRpc('voice.test', { profile, text, broadcast: false });
+      const result = data && data.result;
+      if (token !== convTestToken) return;
+      if (!result || !result.ok || !result.url) {
+        if (hint) hint.textContent = 'Voice failed: ' + ((result && result.error) || (data && data.error && data.error.message) || 'unknown error');
+        return;
+      }
+      if (hint) {
+        hint.textContent = `${label} · ${result.voice} · ${Number(result.speed).toFixed(2)}× · ${Math.round((result.volume ?? 0.9) * 100)}%`;
+      }
+      await playConvClip(result);
+    }
+
+    async function testConversation() {
+      const entry = firstConversationForTest();
+      if (!entry) {
+        document.getElementById('convHint').textContent = 'No enabled conversation is available to test.';
+        return;
+      }
+      const token = ++convTestToken;
+      const clips = [{ profile: 'maleSeller', text: entry.male }];
+      clips.push({ profile: 'femaleSeller', text: entry.female });
+      if (entry.followUp) clips.push({ profile: 'maleSeller', text: entry.followUp });
+      document.getElementById('convHint').textContent = `Testing "${entry.id}" with both seller profiles…`;
+      for (const clip of clips) {
+        if (token !== convTestToken) return;
+        const data = await sendRpc('voice.test', { profile: clip.profile, text: clip.text, broadcast: false });
+        const result = data && data.result;
+        if (token !== convTestToken) return;
+        if (!result || !result.ok || !result.url) {
+          document.getElementById('convHint').textContent =
+            'Conversation test failed: ' + ((result && result.error) || (data && data.error && data.error.message) || 'unknown error');
+          return;
+        }
+        document.getElementById('convPreviewHint').textContent =
+          `${convSpeakerLabel(clip.profile)} · ${result.voice} · ${Number(result.speed).toFixed(2)}× · ${Math.round((result.volume ?? 0.9) * 100)}%`;
+        await playConvClip(result);
+        if (token !== convTestToken) return;
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
+      document.getElementById('convHint').textContent = `Conversation test complete · "${entry.id}" used Male Seller then Female Seller.`;
+    }
+
+    (function wireConversations() {
+      document.getElementById('btnConvToggle')?.addEventListener('click', () => {
+        applyConvSettings({ enabled: !(conversationState && conversationState.settings.enabled !== false) });
+      });
+      document.getElementById('btnConvStartStop')?.addEventListener('click', () => {
+        const running = Boolean(conversationState && conversationState.settings.running !== false);
+        applyConvSettings({ running: !running });
+      });
+      document.getElementById('convInterval')?.addEventListener('change', (event) => {
+        applyConvSettings({ interval: Number(event.target.value) });
+      });
+      document.getElementById('btnConvShuffle')?.addEventListener('click', () => {
+        applyConvSettings({ shuffle: !(conversationState && conversationState.settings.shuffle !== false) });
+      });
+      document.getElementById('btnConvTest')?.addEventListener('click', testConversation);
+      document.getElementById('btnConvPreviewMale')?.addEventListener('click', () => {
+        const entry = firstConversationForTest();
+        playConversationPreview('maleSeller', entry ? entry.male : 'Welcome to Sunny Side Sips!', 'Male Seller');
+      });
+      document.getElementById('btnConvPreviewFemale')?.addEventListener('click', () => {
+        const entry = firstConversationForTest();
+        playConversationPreview('femaleSeller', entry ? entry.female : 'Welcome to Sunny Side Sips!', 'Female Seller');
+      });
+      document.getElementById('btnConvRestore')?.addEventListener('click', async () => {
+        if (!confirm('Restore all default conversations? Custom conversations and edits will be removed.')) return;
+        const data = await sendRpc('conversation.restoreDefaults');
+        const result = data && data.result;
+        if (result && result.conversations) renderConversations(result.conversations, true);
+      });
+      document.getElementById('btnConvClearHistory')?.addEventListener('click', async () => {
+        if (!confirm('Clear the conversation history?')) return;
+        const data = await sendRpc('conversation.clearHistory');
+        const result = data && data.result;
+        if (result && result.conversations) renderConversations(result.conversations, true);
+      });
+      document.getElementById('btnConvAdd')?.addEventListener('click', async () => {
+        const male = document.getElementById('convAddMale').value.trim();
+        const female = document.getElementById('convAddFemale').value.trim();
+        const hint = document.getElementById('convAddHint');
+        if (!male || !female) {
+          if (hint) hint.textContent = 'Both seller lines are required.';
+          return;
+        }
+        const contexts = document.getElementById('convAddContexts').value
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean);
+        const data = await sendRpc('conversation.addExchange', {
+          category: document.getElementById('convAddCategory').value,
+          male,
+          female,
+          followUp: document.getElementById('convAddFollow').value.trim(),
+          contexts
+        });
+        const result = data && data.result;
+        if (result && result.ok) {
+          document.getElementById('convAddMale').value = '';
+          document.getElementById('convAddFemale').value = '';
+          document.getElementById('convAddFollow').value = '';
+          document.getElementById('convAddContexts').value = '';
+          if (hint) hint.textContent = `Added ${result.id} · saved on the server.`;
+          renderConversations(result.conversations, true);
+        } else if (hint) {
+          hint.textContent = 'Could not add: ' + ((result && result.error) || (data && data.error && data.error.message) || 'unknown error');
+        }
+      });
+      document.getElementById('convSearch')?.addEventListener('input', () => renderConvList(true));
+      document.getElementById('convFilter')?.addEventListener('change', () => renderConvList(true));
+      document.getElementById('convCategories')?.addEventListener('change', (event) => {
+        const id = event.target && event.target.dataset ? event.target.dataset.convCat : '';
+        if (!id) return;
+        applyConvSettings({ categories: { [id]: Boolean(event.target.checked) } });
+      });
+      document.getElementById('convList')?.addEventListener('click', async (event) => {
+        const row = event.target.closest('.conv-row');
+        if (!row) return;
+        const id = row.dataset.convId;
+        const entry = conversationState && conversationState.list.find((item) => item.id === id);
+        if (event.target.closest('[data-conv-edit]')) {
+          row.classList.add('editing');
+          return;
+        }
+        if (event.target.closest('[data-conv-cancel]')) {
+          row.classList.remove('editing');
+          return;
+        }
+        if (event.target.closest('[data-conv-delete]')) {
+          if (!confirm(`Delete conversation ${id}?`)) return;
+          const data = await sendRpc('conversation.deleteExchange', { id });
+          const result = data && data.result;
+          if (result && result.conversations) renderConversations(result.conversations, true);
+          return;
+        }
+        if (event.target.closest('[data-conv-save]')) {
+          const male = row.querySelector('[data-conv-male]').value.trim();
+          const female = row.querySelector('[data-conv-female]').value.trim();
+          if (!male || !female) {
+            alert('Both seller lines are required.');
+            return;
+          }
+          const contexts = row.querySelector('[data-conv-contexts]').value
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+          const data = await sendRpc('conversation.updateExchange', {
+            id,
+            patch: {
+              male,
+              female,
+              followUp: row.querySelector('[data-conv-follow]').value.trim(),
+              category: row.querySelector('[data-conv-category]').value,
+              contexts
+            }
+          });
+          const result = data && data.result;
+          if (result && result.conversations) {
+            row.classList.remove('editing');
+            renderConversations(result.conversations, true);
+          } else {
+            alert('Could not save: ' + ((result && result.error) || (data && data.error && data.error.message) || 'unknown error'));
+          }
+        }
+      });
+      document.getElementById('convList')?.addEventListener('change', async (event) => {
+        if (!event.target.matches('[data-conv-enable]')) return;
+        const row = event.target.closest('.conv-row');
+        if (!row) return;
+        const data = await sendRpc('conversation.updateExchange', {
+          id: row.dataset.convId,
+          patch: { enabled: Boolean(event.target.checked) }
+        });
+        const result = data && data.result;
+        if (result && result.conversations) renderConversations(result.conversations, true);
+      });
+      setInterval(renderConvStatus, 1000);
     })();
 
     // ------------------------------------------------------- shop announcer
