@@ -1,0 +1,66 @@
+{
+  "customersServed": 3,
+  "drinksSold": 3,
+  "totalTips": 32,
+  "likes": 0,
+  "follows": 2,
+  "comments": 0,
+  "gifts": 1,
+  "totalCoins": 20,
+  "recentGifts": [
+    {
+      "id": "gift_1793598426226_f3cw",
+      "user": "Mia Carter",
+      "uniqueId": "Mia Carter",
+      "avatar": "",
+      "giftId": "coin_20",
+      "giftName": "20-coin gift",
+      "giftIcon": "/assets/gift_icon/grandCeremony.webp",
+      "giftCoins": 20,
+      "coins": 20,
+      "units": 1,
+      "drinkId": "iced-coffee",
+      "drinkName": "Iced Coffee",
+      "drinkImage": "/assets/drinks/Iced_Coffee.jpg",
+      "at": "2026-11-02T05:47:06.226Z"
+    }
+  ],
+  "supporters": {
+    "Mia Carter": {
+      "name": "Mia Carter",
+      "uniqueId": "Mia Carter",
+      "avatar": "",
+      "tips": 20,
+      "coins": 20,
+      "drinks": 2,
+      "gifts": 1,
+      "lastNote": "Followed the shop"
+    },
+    "grandpa.joe": {
+      "name": "Grandpa Joe",
+      "uniqueId": "grandpa.joe",
+      "avatar": "",
+      "tips": 12,
+      "coins": 0,
+      "drinks": 1,
+      "gifts": 0,
+      "lastNote": "Followed the shop"
+    }
+  },
+  "settings": {
+    "running": true,
+    "paused": false,
+    "spawnRate": 1.2,
+    "ttsEnabled": true,
+    "ttsLanguage": "en",
+    "ttsVoice": "en_US-amy-medium",
+    "ttsSpeed": 1,
+    "ttsMaxChars": 120,
+    "bgMusicEnabled": true,
+    "sfxEnabled": true,
+    "musicVolume": 0.55,
+    "ttsVolume": 0.9,
+    "autoSim": false,
+    "autoSimIntervalMs": 9000
+  }
+}

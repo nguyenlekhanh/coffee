@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sunny Side Sips — Stream Control Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --cream: #fff7e4;
+      --ink: #3b2a20;
+      --ink-soft: #6b5140;
+      --coral: #ef5a4b;
+      --coral-dark: #c93a2c;
+      --sun: #ffc94d;
+      --mint: #45b980;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      padding: 26px;
+      background: radial-gradient(circle at 20% 0%, #4a4761 0%, #232135 55%, #17161f 100%);
+      color: var(--ink);
+      font-family: 'Nunito', sans-serif;
+    }
+    .container { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      background: var(--cream); border: 4px solid var(--ink); border-radius: 20px;
+      padding: 18px 22px; box-shadow: 0 8px 0 rgba(0, 0, 0, 0.35);
+    }
+    .title { font-family: 'Baloo 2', sans-serif; font-size: 28px; color: var(--coral-dark); line-height: 1.1; }
+    .subtitle { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin-top: 4px; }
+    .links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      cursor: pointer; font-family: inherit; font-weight: 800; font-size: 13.5px;
+      color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 11px;
+      padding: 9px 13px; text-decoration: none; display: inline-flex; align-items: center;
+      justify-content: center; gap: 6px; box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); }
+    .btn.gold { background: linear-gradient(180deg, #ffd76a 0%, #f0b12c 100%); }
+    .btn.danger { background: linear-gradient(180deg, #ff9a8c 0%, #ef5a4b 100%); color: #2b0d08; }
+    .btn.on { background: linear-gradient(180deg, #9be9bd 0%, #45b980 100%); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .card {
+      background: var(--cream); border: 4px solid var(--ink); border-radius: 18px;
+      padding: 16px; display: flex; flex-direction: column; gap: 12px;
+      box-shadow: 0 7px 0 rgba(0, 0, 0, 0.28);
+    }
+    .card h2 {
+      font-family: 'Baloo 2', sans-serif; font-size: 19px; color: var(--coral-dark);
+      border-bottom: 2px dashed rgba(59, 42, 32, 0.25); padding-bottom: 8px;
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 150px; }
+    input[type="text"], textarea, select {
+      width: 100%; background: #fff; border: 2px solid rgba(59, 42, 32, 0.5);
+      border-radius: 10px; padding: 9px 11px; font-family: inherit; font-size: 13.5px;
+      font-weight: 600; color: var(--ink); outline: none;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: var(--coral); }
+    textarea { min-height: 96px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+    input[type="range"] { width: 100%; accent-color: var(--coral); }
+    .actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .label-line { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 800; color: var(--ink-soft); }
+    .hint { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); line-height: 1.4; }
+    pre {
+      background: #241f1a; color: #9ef0c0; border-radius: 12px; padding: 12px;
+      font-size: 12px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid rgba(59, 42, 32, 0.15); }
+    th { font-size: 11.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-soft); }
+    .status-bar { font-size: 13px; font-weight: 800; color: var(--ink-soft); }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: var(--sun); border: 2px solid var(--ink); }
+    #statusBanner { margin-top: 6px; }
+    .music-progress {
+      height: 10px; background: rgba(59, 42, 32, 0.15); border-radius: 999px;
+      border: 2px solid rgba(59, 42, 32, 0.35); overflow: hidden;
+    }
+    .music-progress-fill {
+      height: 100%; width: 0%; background: linear-gradient(90deg, #ffc94d, #ef5a4b);
+      transition: width 0.25s linear;
+    }
+    .music-list { display: flex; flex-direction: column; gap: 6px; }
+    .music-item {
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 800; color: var(--ink);
+      background: #fff; border: 2px solid rgba(59, 42, 32, 0.35); border-radius: 10px;
+      padding: 7px 10px; text-align: left;
+    }
+    .music-item:hover { border-color: var(--coral); }
+    .music-item.active { background: linear-gradient(180deg, #ffe9a8 0%, #ffd76a 100%); border-color: var(--ink); }
+    .music-index {
+      width: 22px; height: 22px; border-radius: 999px; background: var(--cream);
+      border: 2px solid rgba(59, 42, 32, 0.35); display: inline-flex;
+      align-items: center; justify-content: center; font-size: 11px; flex: 0 0 auto;
+    }
+    .music-title { flex: 1; }
+    .music-state { font-size: 11.5px; color: var(--coral-dark); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="title">🥤 SUNNY SIDE SIPS — STREAM CONTROL PANEL</div>
+        <div class="subtitle">Bun.js · Express · WebSocket · JSON-RPC 2.0 · TikTok Live</div>
+        <div class="status-bar" id="statusBanner">Loading shop state…</div>
+      </div>
+      <div class="links">
+        <a class="btn" href="/?obs=1" target="_blank">📺 OBS 9:16 Clean View</a>
+        <a class="btn gold" href="/" target="_blank">🥤 Open Live Screen</a>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>🎮 1. Game Controls</h2>
+        <div class="row">
+          <button class="btn gold" id="btnStart">▶ Start</button>
+          <button class="btn" id="btnPause">⏸ Pause / Resume</button>
+          <button class="btn danger" id="btnReset">⟲ Reset Shop</button>
+        </div>
+        <div>
+          <div class="label-line"><span>🚶 Customer spawn rate</span><strong id="valSpawn">1.00×</strong></div>
+          <input type="range" id="sliderSpawn" min="25" max="300" step="5" value="100" />
+        </div>
+        <div class="row">
+          <button class="btn" id="btnSpawnCustomer">🙋 Spawn one customer</button>
+        </div>
+        <div class="hint" id="gameHint">Running · the queue, tables and drink service are simulated in the browser.</div>
+      </section>
+
+      <section class="card">
+        <h2>📡 2. TikTok Live Connection</h2>
+        <div class="row">
+          <input type="text" id="ttUser" placeholder="@username or live link" value="@zenfacts_vn" />
+          <button class="btn gold" id="btnConn">Connect</button>
+          <button class="btn" id="btnDisc">Disconnect</button>
+        </div>
+        <button class="btn" id="btnAutoSim">🤖 Auto Demo Interactions: OFF</button>
+        <div class="hint" id="tiktokHint">Follow, like, comment and gift events are mapped onto shop interactions.</div>
+        <div class="hint">
+          Event → gameplay: <strong>Follow</strong> = VIP free drink · <strong>Like</strong> = crowd rush ·
+          <strong>Comment</strong> = drink order · <strong>Gift</strong> = party tray.
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>🎬 3. Send Interactions (JSON-RPC 2.0)</h2>
+        <div class="row">
+          <input type="text" id="rpcUser" placeholder="Viewer name" value="Mia Carter" />
+          <input type="text" id="rpcOrder" placeholder="Order / comment" value="One fresh lemonade, extra ice please!" />
+        </div>
+        <div class="actions">
+          <button class="btn" data-act="follow">💛 Follow guest</button>
+          <button class="btn" data-act="like">❤️ Like rush</button>
+          <button class="btn" data-act="comment">💬 Comment order</button>
+          <button class="btn" data-act="gift">🎁 Gift party tray</button>
+          <button class="btn gold" data-act="mystery">🥤 Mystery sip</button>
+          <button class="btn" data-act="free">🧊 Free sample</button>
+        </div>
+        <div class="hint">Every action also spawns the matching customer and updates the live stage.</div>
+      </section>
+
+      <section class="card">
+        <h2>🎙️ 4. Piper Voice</h2>
+        <div class="row">
+          <div>
+            <div class="label-line"><span>Language</span></div>
+            <select id="ttsLanguage">
+              <option value="en">English</option>
+              <option value="vi">Vietnamese</option>
+            </select>
+          </div>
+          <div>
+            <div class="label-line"><span>Voice</span></div>
+            <select id="ttsVoice"></select>
+          </div>
+          <div>
+            <div class="label-line"><span>Spoken comments</span></div>
+            <button class="btn on" id="btnTtsToggle">Voice: ON</button>
+          </div>
+        </div>
+        <div>
+          <div class="label-line"><span>Speech speed</span><strong id="valSpeed">1.00×</strong></div>
+          <input type="range" id="sliderSpeed" min="50" max="200" step="5" value="100" />
+        </div>
+        <div>
+          <div class="label-line"><span>Voice volume</span><strong id="valVoiceVol">90%</strong></div>
+          <input type="range" id="sliderVoiceVol" min="0" max="100" step="5" value="90" />
+        </div>
+        <div class="row">
+          <input type="text" id="ttsText" value="Welcome to Sunny Side Sips! Fresh lemonade, ice cold cola and berry smoothies all day long." />
+          <button class="btn gold" id="btnSpeak">Test voice</button>
+        </div>
+        <audio id="audioPreview" controls style="width: 100%; height: 38px;"></audio>
+        <div class="hint" id="ttsHint">Piper runs locally from config/piper — no models are downloaded.</div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>🎵 Background Music</h2>
+        <div class="row">
+          <div>
+            <div class="label-line"><span>Now playing</span><strong id="musicNow">—</strong></div>
+            <div class="hint" id="musicHint">The playlist starts automatically with the shop.</div>
+          </div>
+          <div>
+            <div class="label-line"><span>Music volume</span><strong id="valMusicVol">55%</strong></div>
+            <input type="range" id="sliderMusicVol" min="0" max="100" step="5" value="55" />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnMusicPrev">⏮ Previous</button>
+          <button class="btn gold" id="btnMusicPlay">▶ Play</button>
+          <button class="btn" id="btnMusicPause">⏸ Pause</button>
+          <button class="btn" id="btnMusicNext">⏭ Next</button>
+        </div>
+        <div>
+          <div class="label-line"><span>Progress</span><strong id="musicTime">0:00 / 0:00</strong></div>
+          <div class="music-progress"><div class="music-progress-fill" id="musicProgress"></div></div>
+        </div>
+        <div class="music-list" id="musicList"></div>
+        <div class="hint" id="musicFoot">All eight tracks are original royalty-free instrumentals generated locally — no vocals, safe for TikTok livestreams.</div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>💝 Gift Donations</h2>
+        <div class="row">
+          <div>
+            <div class="label-line"><span>Total coins</span><strong id="donCoins">0</strong></div>
+          </div>
+          <div>
+            <div class="label-line"><span>Drinks served</span><strong id="donDrinks">0</strong></div>
+          </div>
+          <div>
+            <div class="label-line"><span>Gifts received</span><strong id="donGifts">0</strong></div>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn" data-coins="1">1 coin → Cola</button>
+          <button class="btn" data-coins="5">5 coins → Smoothie</button>
+          <button class="btn" data-coins="10">10 coins → Slushie</button>
+          <button class="btn" data-coins="15">15 coins → Orange Soda</button>
+          <button class="btn gold" data-coins="20">20 coins → Iced Coffee</button>
+          <button class="btn gold" data-coins="25">25 coins → Lemonade</button>
+        </div>
+        <div class="hint">The drink is chosen by the gift's coin value only (1, 5, 10, 15, 20, 25). The gift icons are decorative menu art — gift identity never picks the drink.</div>
+        <table>
+          <thead><tr><th>Gift</th><th>Viewer</th><th>Drink</th><th>Coins</th></tr></thead>
+          <tbody id="recentGiftsBody">
+            <tr><td colspan="4" class="hint">No gifts yet.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>🔌 5. JSON-RPC Console</h2>
+        <div class="row">
+          <input type="text" id="rpcMethod" value="shop.getState" />
+          <button class="btn gold" id="btnSendRpc">Send RPC</button>
+          <button class="btn" id="btnRefresh">Refresh State</button>
+        </div>
+        <textarea id="rpcParams">{
+  "user": "Mia Carter",
+  "drinkId": "lemonade"
+}</textarea>
+        <pre id="rpcOutput">{ "status": "Ready for JSON-RPC 2.0" }</pre>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>🏆 6. Top Supporters</h2>
+        <table>
+          <thead><tr><th>#</th><th>Viewer</th><th>Coins</th><th>Tips</th><th>Drinks</th><th>Gifts</th></tr></thead>
+          <tbody id="supportersBody">
+            <tr><td colspan="6" class="hint">No supporters yet.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+
+  <script src="/js/music.js"></script>
+  <script>
+    async function sendRpc(method, extraParams = {}) {
+      const user = document.getElementById('rpcUser').value.trim() || 'Guest';
+      const order = document.getElementById('rpcOrder').value.trim();
+      const body = { jsonrpc: '2.0', id: Date.now(), method, params: { user, order, ...extraParams } };
+      const res = await fetch('/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      document.getElementById('rpcOutput').textContent = JSON.stringify(data, null, 2);
+      refreshStatus();
+      return data;
+    }
+
+    document.querySelectorAll('[data-act]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const act = btn.getAttribute('data-act');
+        if (act === 'follow') sendRpc('shop.follow', {});
+        if (act === 'like') sendRpc('shop.like', { count: 6 });
+        if (act === 'comment') sendRpc('shop.comment', { comment: document.getElementById('rpcOrder').value.trim() });
+        if (act === 'gift') sendRpc('shop.gift', { coins: 48, giftName: 'Coffee Run' });
+        if (act === 'mystery') sendRpc('shop.mysteryDrink', {});
+        if (act === 'free') sendRpc('shop.freeDrink', {});
+      });
+    });
+
+    document.querySelectorAll('[data-coins]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        sendRpc('shop.giftOrder', {
+          coins: Number(btn.getAttribute('data-coins')),
+          units: 1
+        });
+      });
+    });
+
+    document.getElementById('btnStart').onclick = () => sendRpc('game.start');
+    document.getElementById('btnPause').onclick = () => sendRpc('game.pause', { paused: true });
+    document.getElementById('btnReset').onclick = () => {
+      if (confirm('Reset all shop counters and supporters?')) sendRpc('game.reset');
+    };
+    document.getElementById('btnSpawnCustomer').onclick = () => sendRpc('game.spawnCustomer', { user: 'Walk-in guest' });
+    document.getElementById('sliderSpawn').oninput = (e) => {
+      document.getElementById('valSpawn').textContent = (Number(e.target.value) / 100).toFixed(2) + '×';
+    };
+    document.getElementById('sliderSpawn').onchange = (e) => {
+      sendRpc('game.setSpawnRate', { rate: Number(e.target.value) / 100 });
+    };
+
+    document.getElementById('btnConn').onclick = () => {
+      const username = document.getElementById('ttUser').value.trim();
+      sendRpc('live.connect', { username });
+    };
+    document.getElementById('btnDisc').onclick = () => sendRpc('live.disconnect');
+    let autoSimOn = false;
+    document.getElementById('btnAutoSim').onclick = (e) => {
+      autoSimOn = !autoSimOn;
+      e.currentTarget.textContent = '🤖 Auto Demo Interactions: ' + (autoSimOn ? 'ON' : 'OFF');
+      e.currentTarget.classList.toggle('on', autoSimOn);
+      sendRpc('live.setAutoSim', { enabled: autoSimOn });
+    };
+
+    let ttsVoices = [];
+    let ttsEnabled = true;
+
+    function renderVoiceOptions() {
+      const language = document.getElementById('ttsLanguage').value;
+      const select = document.getElementById('ttsVoice');
+      const current = select.value;
+      const list = ttsVoices.filter((voice) => voice.language === language);
+      select.innerHTML = list.length
+        ? list.map((voice) => `<option value="${voice.id}">${escapeHtml(voice.name)}</option>`).join('')
+        : '<option value="">No model in config/piper</option>';
+      if (list.some((voice) => voice.id === current)) select.value = current;
+    }
+
+    document.getElementById('ttsLanguage').onchange = async (e) => {
+      const language = e.target.value;
+      const list = ttsVoices.filter((voice) => voice.language === language);
+      await sendRpc('temple.updateSettings', {
+        ttsLanguage: language,
+        ttsVoice: list[0] ? list[0].id : undefined
+      });
+      renderVoiceOptions();
+    };
+    document.getElementById('ttsVoice').onchange = (e) =>
+      sendRpc('temple.updateSettings', { ttsVoice: e.target.value });
+
+    document.getElementById('btnTtsToggle').onclick = (e) => {
+      ttsEnabled = !ttsEnabled;
+      e.currentTarget.textContent = 'Voice: ' + (ttsEnabled ? 'ON' : 'OFF');
+      e.currentTarget.classList.toggle('on', ttsEnabled);
+      sendRpc('temple.updateSettings', { ttsEnabled });
+    };
+
+    const speedSlider = document.getElementById('sliderSpeed');
+    speedSlider.oninput = (e) => {
+      document.getElementById('valSpeed').textContent = (Number(e.target.value) / 100).toFixed(2) + '×';
+    };
+    speedSlider.onchange = (e) => sendRpc('temple.updateSettings', { ttsSpeed: Number(e.target.value) / 100 });
+
+    const voiceVolSlider = document.getElementById('sliderVoiceVol');
+    voiceVolSlider.oninput = (e) => {
+      document.getElementById('valVoiceVol').textContent = e.target.value + '%';
+    };
+    voiceVolSlider.onchange = (e) =>
+      sendRpc('temple.updateSettings', { ttsVolume: Number(e.target.value) / 100 });
+
+    document.getElementById('btnSpeak').onclick = async () => {
+      const text = document.getElementById('ttsText').value.trim();
+      const language = document.getElementById('ttsLanguage').value;
+      const voice = document.getElementById('ttsVoice').value;
+      const speed = Number(document.getElementById('sliderSpeed').value) / 100;
+      const hint = document.getElementById('ttsHint');
+      hint.textContent = 'Synthesizing with Piper…';
+      const data = await sendRpc('temple.speak', { text, language, voice, speed, broadcast: true });
+      if (data && data.result && data.result.url) {
+        const player = document.getElementById('audioPreview');
+        player.src = data.result.url;
+        player.play().catch(() => {});
+        hint.textContent = `Spoken with ${data.result.voice} (${data.result.language}) in ${data.result.synthSec}s`;
+      } else {
+        hint.textContent =
+          'Voice engine unavailable: ' + ((data && data.result && data.result.error) || 'unknown error');
+      }
+    };
+
+    document.getElementById('btnSendRpc').onclick = async () => {
+      const method = document.getElementById('rpcMethod').value.trim();
+      let params = {};
+      try {
+        params = JSON.parse(document.getElementById('rpcParams').value || '{}');
+      } catch (err) {
+        document.getElementById('rpcOutput').textContent = 'Invalid JSON params: ' + err.message;
+        return;
+      }
+      const res = await fetch('/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params })
+      });
+      const data = await res.json();
+      document.getElementById('rpcOutput').textContent = JSON.stringify(data, null, 2);
+      refreshStatus();
+    };
+
+    document.getElementById('btnRefresh').onclick = refreshStatus;
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch('/api/state');
+        const st = await res.json();
+
+        document.getElementById('statusBanner').innerHTML =
+          `<span class="pill">${st.settings.paused ? 'PAUSED' : 'RUNNING'}</span> ` +
+          `Served: ${st.customersServed} · Drinks: ${st.drinksSold} · Tips: $${Number(st.totalTips).toFixed(2)} · ` +
+          `Likes: ${st.likes} · Follows: ${st.follows} · Comments: ${st.comments} · Gifts: ${st.gifts} · ` +
+          `Spawn: ${Number(st.settings.spawnRate).toFixed(2)}× · TikTok: ${st.tiktok.connected ? '@' + st.tiktok.username : 'offline'}`;
+
+        document.getElementById('sliderSpawn').value = String(Math.round(st.settings.spawnRate * 100));
+        document.getElementById('valSpawn').textContent = Number(st.settings.spawnRate).toFixed(2) + '×';
+        autoSimOn = Boolean(st.settings.autoSim);
+        const simBtn = document.getElementById('btnAutoSim');
+        simBtn.textContent = '🤖 Auto Demo Interactions: ' + (autoSimOn ? 'ON' : 'OFF');
+        simBtn.classList.toggle('on', autoSimOn);
+
+        document.getElementById('gameHint').textContent = st.settings.paused
+          ? 'Paused · customers wait where they are.'
+          : 'Running · the queue, tables and drink service are simulated in the browser.';
+
+        document.getElementById('tiktokHint').textContent = st.tiktok.connected
+          ? `Connected to @${st.tiktok.username} · ${st.tiktok.viewerCount || 0} viewers`
+          : st.tiktok.lastError
+            ? 'Last connection error: ' + st.tiktok.lastError
+            : 'Not connected. Enter a live TikTok @username to listen for events.';
+
+        if (st.tts) {
+          ttsVoices = Array.isArray(st.tts.voices) ? st.tts.voices : [];
+          document.getElementById('ttsLanguage').value = st.settings.ttsLanguage || 'en';
+          renderVoiceOptions();
+          if (st.settings.ttsVoice) document.getElementById('ttsVoice').value = st.settings.ttsVoice;
+          document.getElementById('sliderSpeed').value = String(Math.round((st.settings.ttsSpeed || 1) * 100));
+          document.getElementById('valSpeed').textContent = Number(st.settings.ttsSpeed || 1).toFixed(2) + '×';
+          document.getElementById('sliderVoiceVol').value = String(Math.round((st.settings.ttsVolume ?? 0.9) * 100));
+          document.getElementById('valVoiceVol').textContent = Math.round((st.settings.ttsVolume ?? 0.9) * 100) + '%';
+          const musicVol = Number(st.settings.musicVolume ?? 0.55);
+          if (musicPlayer) musicPlayer.setVolume(musicVol);
+          if (!musicDragging) {
+            document.getElementById('sliderMusicVol').value = String(Math.round(musicVol * 100));
+            document.getElementById('valMusicVol').textContent = Math.round(musicVol * 100) + '%';
+          }
+          ttsEnabled = st.settings.ttsEnabled !== false;
+          const voiceBtn = document.getElementById('btnTtsToggle');
+          voiceBtn.textContent = 'Voice: ' + (ttsEnabled ? 'ON' : 'OFF');
+          voiceBtn.classList.toggle('on', ttsEnabled);
+          document.getElementById('ttsHint').textContent = st.tts.ready
+            ? `Piper ready · ${st.tts.voices.length} local voices · ${st.tts.executable || 'python -m piper'}`
+            : `Piper ${st.tts.status}${st.tts.error ? ' · ' + st.tts.error : ''}`;
+        }
+
+        const donationState = st.donation || {};
+        document.getElementById('donCoins').textContent = Number(donationState.totalCoins || 0).toLocaleString('en-US');
+        document.getElementById('donDrinks').textContent = Number(donationState.drinksServed || 0).toLocaleString('en-US');
+        document.getElementById('donGifts').textContent = Number(donationState.giftsReceived || 0).toLocaleString('en-US');
+        const recentGifts = Array.isArray(donationState.recentGifts) ? donationState.recentGifts : [];
+        document.getElementById('recentGiftsBody').innerHTML = recentGifts.length
+          ? recentGifts
+              .map(
+                (gift) =>
+                  `<tr><td><img src="${gift.giftIcon}" alt="" style="width:22px;height:22px;vertical-align:middle;object-fit:contain" /> ${escapeHtml(gift.giftName)}</td>` +
+                  `<td>${escapeHtml(gift.user)}</td><td>${escapeHtml(gift.drinkName)}</td><td>${gift.coins}</td></tr>`
+              )
+              .join('')
+          : '<tr><td colspan="4" class="hint">No gifts yet.</td></tr>';
+
+        const body = document.getElementById('supportersBody');
+        if (!st.leaderboard || st.leaderboard.length === 0) {
+          body.innerHTML = '<tr><td colspan="6" class="hint">No supporters yet.</td></tr>';
+        } else {
+          body.innerHTML = st.leaderboard
+            .map(
+              (s) =>
+                `<tr><td>${s.rank}</td><td>${escapeHtml(s.name)}</td><td>${Number(s.coins || 0).toLocaleString('en-US')}</td><td>$${Number(s.tips).toFixed(2)}</td>` +
+                `<td>${s.drinks}</td><td>${s.lastNote ? escapeHtml(s.lastNote) : '-'}</td></tr>`
+            )
+            .join('');
+        }
+      } catch (err) {
+        document.getElementById('statusBanner').textContent = 'Server not reachable: ' + err.message;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    refreshStatus();
+    setInterval(refreshStatus, 4000);
+
+    // ---------------------------------------------------------- background music
+    let musicDragging = false;
+    let musicListBuilt = false;
+    const musicPlayer = window.ShopMusicPlayer
+      ? new window.ShopMusicPlayer({ role: 'remote', onChange: renderMusicPanel })
+      : null;
+
+    function fmtTime(sec) {
+      const total = Math.max(0, Math.round(Number(sec) || 0));
+      return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }
+
+    function buildMusicList() {
+      const list = document.getElementById('musicList');
+      if (!list || musicListBuilt) return;
+      const tracks = window.SHOP_MUSIC_PLAYLIST || [];
+      list.innerHTML = tracks
+        .map(
+          (track, i) =>
+            `<button class="music-item" data-track="${i}" type="button">` +
+            `<span class="music-index">${i + 1}</span>` +
+            `<span class="music-title">${escapeHtml(track.title)}</span>` +
+            `<span class="music-state"></span></button>`
+        )
+        .join('');
+      list.querySelectorAll('[data-track]').forEach((btn) => {
+        btn.onclick = () => musicPlayer && musicPlayer.select(Number(btn.dataset.track));
+      });
+      musicListBuilt = true;
+    }
+
+    function renderMusicPanel(snap) {
+      if (!snap) return;
+      buildMusicList();
+      const now = document.getElementById('musicNow');
+      if (now) now.textContent = snap.title || '—';
+      const hint = document.getElementById('musicHint');
+      if (hint) {
+        if (snap.blocked) hint.textContent = 'Autoplay blocked by the browser — press Play, or click the stage once.';
+        else if (snap.remoteLinked) hint.textContent = `${snap.playing ? 'Playing' : 'Paused'} · synced with the live stage`;
+        else hint.textContent = `${snap.playing ? 'Playing' : 'Paused'} · playing in this panel`;
+      }
+      const slider = document.getElementById('sliderMusicVol');
+      const label = document.getElementById('valMusicVol');
+      const pct = Math.round((Number(snap.volume) || 0) * 100);
+      if (slider && !musicDragging) slider.value = String(pct);
+      if (label) label.textContent = pct + '%';
+      const time = Number(snap.time) || 0;
+      const duration = Number(snap.duration) || 0;
+      const timeEl = document.getElementById('musicTime');
+      if (timeEl) timeEl.textContent = fmtTime(time) + ' / ' + fmtTime(duration);
+      const bar = document.getElementById('musicProgress');
+      if (bar) bar.style.width = duration ? Math.min(100, (time / duration) * 100).toFixed(1) + '%' : '0%';
+      document.querySelectorAll('.music-item').forEach((el) => {
+        const active = Number(el.dataset.track) === snap.index;
+        el.classList.toggle('active', active);
+        const state = el.querySelector('.music-state');
+        if (state) state.textContent = active ? (snap.playing ? '▶ playing' : '⏸ paused') : '';
+      });
+      const playBtn = document.getElementById('btnMusicPlay');
+      if (playBtn) playBtn.classList.toggle('on', Boolean(snap.playing));
+    }
+
+    const musicSlider = document.getElementById('sliderMusicVol');
+    if (musicSlider) {
+      musicSlider.addEventListener('pointerdown', () => {
+        musicDragging = true;
+      });
+      musicSlider.addEventListener('input', (e) => {
+        const pct = Number(e.target.value);
+        document.getElementById('valMusicVol').textContent = pct + '%';
+        if (musicPlayer) musicPlayer.setVolume(pct / 100);
+      });
+      musicSlider.addEventListener('change', (e) => {
+        musicDragging = false;
+        sendRpc('temple.updateSettings', { musicVolume: Number(e.target.value) / 100 });
+      });
+    }
+    document.getElementById('btnMusicPlay')?.addEventListener('click', () => musicPlayer && musicPlayer.play());
+    document.getElementById('btnMusicPause')?.addEventListener('click', () => musicPlayer && musicPlayer.pause());
+    document.getElementById('btnMusicNext')?.addEventListener('click', () => musicPlayer && musicPlayer.next());
+    document.getElementById('btnMusicPrev')?.addEventListener('click', () => musicPlayer && musicPlayer.previous());
+
+    if (musicPlayer) {
+      musicPlayer.initSync();
+      renderMusicPanel(musicPlayer.snapshot());
+    }
+  </script>
+</body>
+</html>

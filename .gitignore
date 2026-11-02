@@ -1,0 +1,13 @@
+node_modules/
+.venv/
+data/tts-cache/
+.DS_Store
+*.log
+*.m4a
+public/assets/bg_chant.m4a
+
+.freebuff
+.env
+.env.example
+__pycache__/
+backup/
