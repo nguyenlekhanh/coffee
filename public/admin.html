@@ -151,6 +151,40 @@
     .vp-test-row .btn { flex: 0 0 auto; padding: 6px 9px; font-size: 12px; }
     .vp-hint { font-size: 11px; line-height: 1.3; color: var(--ink-soft); font-weight: 600; }
     .vp-meta { font-size: 10.5px; letter-spacing: 0.2px; color: var(--ink-soft); font-weight: 700; text-align: right; }
+    .llm-summary {
+      flex: 2 1 320px; display: flex; flex-direction: column; gap: 3px;
+      background: #fff; border: 2px solid rgba(59, 42, 32, 0.28); border-radius: 12px; padding: 9px 11px;
+    }
+    .llm-summary strong { font-family: 'Baloo 2', sans-serif; font-size: 18px; }
+    .llm-provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 900px) { .llm-provider-grid { grid-template-columns: 1fr; } }
+    .llm-provider-card {
+      background: #fff; border: 3px solid rgba(59, 42, 32, 0.4); border-radius: 14px;
+      padding: 11px; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+    }
+    .llm-provider-card.primary { border-color: var(--coral); box-shadow: inset 0 0 0 2px rgba(239, 90, 75, 0.12); }
+    .llm-provider-card.disabled { opacity: 0.68; }
+    .llm-provider-head { display: flex; align-items: flex-start; gap: 8px; }
+    .llm-provider-head strong { flex: 1; font-family: 'Baloo 2', sans-serif; font-size: 17px; overflow-wrap: anywhere; }
+    .llm-role, .llm-health {
+      border: 2px solid var(--ink); border-radius: 999px; padding: 2px 8px;
+      font-size: 10px; font-weight: 800; white-space: nowrap; background: var(--sun);
+    }
+    .llm-health.healthy { background: #bdecca; }
+    .llm-health.error { background: #ffbdb5; }
+    .llm-health.missing_key, .llm-health.not_configured { background: #ffd4a3; }
+    .llm-health.disabled { background: #ddd; }
+    .llm-health.not_tested { background: #d9e8ff; }
+    .llm-kv { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 3px 8px; font-size: 12px; line-height: 1.35; }
+    .llm-kv span:nth-child(odd) { color: var(--ink-soft); font-weight: 800; }
+    .llm-kv span:nth-child(even) { overflow-wrap: anywhere; }
+    .llm-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+    .llm-actions .btn { padding: 5px 8px; font-size: 11.5px; flex: 0 0 auto; }
+    .llm-editor { border-top: 2px dashed rgba(59, 42, 32, 0.25); padding-top: 10px; display: flex; flex-direction: column; gap: 9px; }
+    .llm-editor summary { cursor: pointer; font-weight: 800; color: var(--coral-dark); }
+    .llm-check { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; align-self: flex-end; min-width: 140px; }
+    .llm-check input { accent-color: var(--coral); }
+    .llm-error { color: var(--coral-dark); font-weight: 800; }
     .conv-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; font-weight: 800; color: var(--ink-soft); }
     .conv-status strong { color: var(--ink); }
     .conv-cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -181,6 +215,19 @@
     details.conv-add { background: #fff; border: 2px dashed rgba(59, 42, 32, 0.35); border-radius: 10px; padding: 9px 11px; }
     details.conv-add summary { cursor: pointer; font-weight: 800; font-size: 13px; }
     details.conv-add[open] summary { margin-bottom: 8px; }
+    .reactive-stats { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; }
+    @media (max-width: 900px) { .reactive-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .reactive-stat { background: #fff; border: 2px solid rgba(59, 42, 32, 0.25); border-radius: 10px; padding: 8px; }
+    .reactive-stat span { display: block; font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase; color: var(--ink-soft); font-weight: 800; }
+    .reactive-stat strong { display: block; font-family: 'Baloo 2', sans-serif; font-size: 21px; }
+    .reactive-panels { display: grid; grid-template-columns: 1.3fr 1fr; gap: 9px; }
+    @media (max-width: 780px) { .reactive-panels { grid-template-columns: 1fr; } }
+    .reactive-panel { background: #fff; border: 2px solid rgba(59, 42, 32, 0.25); border-radius: 10px; padding: 9px; font-size: 12px; font-weight: 700; min-width: 0; }
+    .reactive-panel .label-line { margin-top: 0; }
+    .reactive-queue { display: flex; flex-direction: column; gap: 4px; max-height: 130px; overflow-y: auto; color: var(--ink-soft); }
+    .reactive-queue-row { border-bottom: 1px dashed rgba(59, 42, 32, 0.2); padding-bottom: 4px; }
+    .reactive-test-result { max-height: 220px; overflow: auto; font-size: 11px; }
+    #reactiveHint { font-weight: 700; }
     .tt-state {
       display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.8px;
       padding: 4px 10px; border-radius: 8px; background: rgba(59, 42, 32, 0.12); color: var(--ink-soft);
@@ -239,7 +286,7 @@
         <div class="hint" id="tiktokHint">Follow, like, comment and gift events are mapped onto shop interactions.</div>
         <div class="hint">
           Event → gameplay: <strong>Follow</strong> = VIP free drink · <strong>Like</strong> = crowd rush ·
-          <strong>Comment</strong> = drink order · <strong>Gift</strong> = party tray.
+          <strong>Comment</strong> = reactive seller reply / chat order · <strong>Gift</strong> = party tray.
         </div>
       </section>
 
@@ -379,6 +426,153 @@
           <button class="btn" id="btnConvClearHistory">Clear history</button>
         </div>
         <div class="conv-history" id="convHistory"><div class="hint">No conversations recorded yet.</div></div>
+      </section>
+
+      <section class="card" id="reactiveSection" style="grid-column: 1 / -1">
+        <h2>🤖 LIVE REACTIVE SELLER AI</h2>
+        <div class="row">
+          <button class="btn on" id="btnReactiveToggle">AI Responses: ON</button>
+          <button class="btn on" id="btnReactiveUnderstanding">Comment understanding: ON</button>
+          <button class="btn on" id="btnReactiveOrders">Chat orders: ON</button>
+          <button class="btn" id="btnReactiveLlm">LLM provider: OFF</button>
+          <span class="pill" id="reactiveProviderState">Checking…</span>
+        </div>
+        <div class="row">
+          <div>
+            <div class="label-line"><span>Response language</span></div>
+            <select id="reactiveLanguage">
+              <option value="en">English</option>
+              <option value="vi">Vietnamese</option>
+            </select>
+          </div>
+          <div>
+            <div class="label-line"><span>Default seller</span></div>
+            <select id="reactiveDefaultSeller">
+              <option value="alternate">Alternate sellers</option>
+              <option value="maleSeller">Male Seller first</option>
+              <option value="femaleSeller">Female Seller first</option>
+            </select>
+          </div>
+          <div>
+            <div class="label-line"><span>Per-viewer cooldown (sec)</span></div>
+            <input type="number" id="reactiveViewerCooldown" min="5" max="300" step="1" value="20" style="width:110px" />
+          </div>
+          <div>
+            <div class="label-line"><span>Global cooldown (sec)</span></div>
+            <input type="number" id="reactiveGlobalCooldown" min="3" max="60" step="1" value="8" style="width:100px" />
+          </div>
+          <div>
+            <div class="label-line"><span>Max response chars</span></div>
+            <input type="number" id="reactiveMaxLength" min="80" max="320" step="10" value="180" style="width:100px" />
+          </div>
+          <div>
+            <div class="label-line"><span>Confidence threshold</span></div>
+            <input type="number" id="reactiveConfidence" min="0.3" max="0.95" step="0.05" value="0.55" style="width:90px" />
+          </div>
+          <div>
+            <div class="label-line"><span>Max pending</span></div>
+            <input type="number" id="reactiveMaxPending" min="1" max="20" step="1" value="6" style="width:80px" />
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:2 1 360px">
+            <div class="label-line"><span>Active LLM provider</span></div>
+            <div class="hint" id="reactiveActiveProvider">Loading provider manager…</div>
+          </div>
+          <div>
+            <div class="label-line"><span>Dedupe window (sec)</span></div>
+            <input type="number" id="reactiveDedupe" min="10" max="300" step="5" value="45" style="width:100px" />
+          </div>
+          <button class="btn gold" id="btnReactiveSave" style="align-self:flex-end">💾 Save AI settings</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnReactiveTestProvider">🔌 Test Active Provider</button>
+          <button class="btn" id="btnOpenLlmManager">🌐 Manage Providers</button>
+          <span class="hint">Sends one small structured request using the saved server-side configuration.</span>
+        </div>
+        <pre class="rpc-output reactive-test-result" id="reactiveProviderResult">No connection test yet.</pre>
+        <div class="hint" id="reactiveHint">
+          Providers are configured below. API keys remain server-side and are never sent to the browser.
+          Local intent detection and templates keep working when every provider is unavailable.
+        </div>
+        <div class="reactive-stats" id="reactiveStats">
+          <div class="reactive-stat"><span>Comments received</span><strong id="rsReceived">0</strong></div>
+          <div class="reactive-stat"><span>Understood</span><strong id="rsUnderstood">0</strong></div>
+          <div class="reactive-stat"><span>Generated</span><strong id="rsGenerated">0</strong></div>
+          <div class="reactive-stat"><span>Spoken</span><strong id="rsSpoken">0</strong></div>
+          <div class="reactive-stat"><span>Ignored</span><strong id="rsIgnored">0</strong></div>
+          <div class="reactive-stat"><span>Orders</span><strong id="rsOrders">0</strong></div>
+          <div class="reactive-stat"><span>Fallbacks</span><strong id="rsFallback">0</strong></div>
+        </div>
+        <div class="reactive-panels">
+          <div class="reactive-panel">
+            <div class="label-line"><span>Last response</span><span class="hint" id="reactiveProviderNote"></span></div>
+            <div id="reactiveLast">No reactive response yet.</div>
+          </div>
+          <div class="reactive-panel">
+            <div class="label-line"><span>Processing queue</span><span class="hint" id="reactiveQueueCount">0 pending</span></div>
+            <div class="reactive-queue" id="reactiveQueue"><div class="hint">Queue is empty.</div></div>
+          </div>
+        </div>
+        <div class="row">
+          <input type="text" id="reactiveTestUser" value="Admin Test Viewer" placeholder="Viewer username" />
+          <input type="text" id="reactiveTestComment" value="Can I get a lemonade?" placeholder="Sample comment" />
+          <button class="btn gold" id="btnReactiveTest">🧪 Test Comment</button>
+          <button class="btn" id="btnReactiveResetStats">Reset stats</button>
+        </div>
+        <pre class="rpc-output reactive-test-result" id="reactiveTestResult">Test comment runs the same classification, rate-limit bypass, provider/fallback, validation, order and speech pipeline.</pre>
+      </section>
+
+      <section class="card" id="llmManagerSection" style="grid-column: 1 / -1">
+        <h2>🌐 LLM PROVIDER MANAGER</h2>
+        <div class="row">
+          <div class="llm-summary">
+            <span class="hint">Active provider</span>
+            <strong id="llmActiveName">—</strong>
+            <span class="hint" id="llmActiveMeta">No provider configured.</span>
+          </div>
+          <div>
+            <div class="label-line"><span>Max attempts</span></div>
+            <input type="number" id="llmMaxAttempts" min="1" max="10" step="1" value="3" />
+          </div>
+          <button class="btn gold" id="btnLlmSaveSettings" style="align-self:flex-end">💾 Save manager</button>
+          <button class="btn" id="btnLlmAdd" style="align-self:flex-end">➕ Add Provider</button>
+          <button class="btn" id="btnLlmTestChain" style="align-self:flex-end">🧪 Test Primary + Fallbacks</button>
+        </div>
+        <div class="hint" id="llmManagerHint">Providers are tried in order. Authentication and invalid-model failures stop immediately; temporary failures may continue to the next configured provider.</div>
+        <div class="llm-provider-grid" id="llmProviderGrid"><div class="hint">Loading providers…</div></div>
+        <details class="llm-editor" id="llmProviderEditor">
+          <summary id="llmEditorTitle">➕ Add provider</summary>
+          <input type="hidden" id="llmFormId" />
+          <div class="row">
+            <div style="flex:2 1 220px"><div class="label-line"><span>Provider name</span></div><input type="text" id="llmFormName" maxlength="60" placeholder="My Provider" /></div>
+            <div style="flex:2 1 260px"><div class="label-line"><span>Base URL</span></div><input type="text" id="llmFormBase" placeholder="https://api.example.com/v1" /></div>
+            <div style="flex:1 1 180px"><div class="label-line"><span>Endpoint path</span></div><input type="text" id="llmFormPath" value="/chat/completions" /></div>
+          </div>
+          <div class="row">
+            <div style="flex:2 1 260px"><div class="label-line"><span>Model ID</span></div><input type="text" id="llmFormModel" placeholder="provider/model" /></div>
+            <div style="flex:1 1 220px"><div class="label-line"><span>API key</span></div><input type="password" id="llmFormKey" autocomplete="new-password" placeholder="Leave blank to keep current key" /></div>
+            <div><div class="label-line"><span>Timeout (ms)</span></div><input type="number" id="llmFormTimeout" min="3000" max="60000" step="500" value="8000" /></div>
+            <div><div class="label-line"><span>Max tokens</span></div><input type="number" id="llmFormMaxTokens" min="128" max="8000" step="64" value="600" /></div>
+          </div>
+          <div class="row">
+            <div><div class="label-line"><span>Reasoning</span></div><select id="llmFormReasoning"><option value="auto">Provider default / auto</option><option value="off">Disable reasoning</option></select></div>
+            <label class="llm-check"><input type="checkbox" id="llmFormJson" checked /> JSON response format</label>
+            <label class="llm-check"><input type="checkbox" id="llmFormRequiresKey" checked /> API key required</label>
+            <label class="llm-check"><input type="checkbox" id="llmFormEnabled" checked /> Enabled</label>
+          </div>
+          <div class="label-line"><span>Custom headers (JSON, optional)</span><span class="hint">Authorization, cookies and secret-like header names are blocked.</span></div>
+          <textarea id="llmFormHeaders" placeholder='{ "HTTP-Referer": "https://example.com" }'></textarea>
+          <div class="row">
+            <button class="btn gold" id="btnLlmSave">💾 Save Provider</button>
+            <button class="btn" id="btnLlmCancel">Cancel</button>
+            <button class="btn" id="btnLlmFetchModels">🔎 Fetch Models</button>
+            <button class="btn danger" id="btnLlmDeleteKey">🗑 Saved Key</button>
+          </div>
+          <select id="llmModelOptions" hidden></select>
+          <pre class="rpc-output reactive-test-result" id="llmEditorResult">No provider test yet.</pre>
+        </details>
+        <pre class="rpc-output reactive-test-result" id="llmProviderResult">Connection and model results will appear here.</pre>
       </section>
 
       <section class="card" style="grid-column: 1 / -1">
@@ -575,6 +769,7 @@
 
   <script src="/js/announcer.js"></script>
   <script src="/js/music.js"></script>
+  <script src="/js/llm-provider-manager-ui.js"></script>
   <script>
     async function sendRpc(method, extraParams = {}) {
       const user = document.getElementById('rpcUser').value.trim() || 'Guest';
@@ -999,6 +1194,7 @@
 
         renderTikTokStatus(st);
         if (st.conversations) renderConversations(st.conversations);
+        if (st.reactive) renderReactive(st.reactive);
 
         if (st.tts) {
           document.getElementById('ttsLanguage').value = st.settings.ttsLanguage || 'en';
@@ -1850,6 +2046,263 @@
         if (result && result.conversations) renderConversations(result.conversations, true);
       });
       setInterval(renderConvStatus, 1000);
+    })();
+
+    // ------------------------------------------------ live reactive seller
+    let reactiveState = null;
+
+    const REACTIVE_STATUS_LABELS = {
+      ready: 'PROVIDER READY',
+      disabled: 'LLM DISABLED',
+      missing_key: 'API KEY MISSING',
+      not_configured: 'PROVIDER URL MISSING',
+      error: 'PROVIDER ERROR'
+    };
+
+    function reactiveSetValue(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const active = document.activeElement;
+      if (active && active.closest('#reactiveSection') && active !== el && ['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName)) return;
+      if (document.activeElement === el) return;
+      if (el.type === 'checkbox') el.checked = Boolean(value);
+      else el.value = value == null ? '' : String(value);
+    }
+
+    function renderReactive(snapshot) {
+      if (!snapshot || !snapshot.settings) return;
+      reactiveState = snapshot;
+      const settings = snapshot.settings;
+      const stats = snapshot.stats || {};
+      const provider = snapshot.provider || {};
+      renderLlmManager(snapshot.llm);
+      const toggle = document.getElementById('btnReactiveToggle');
+      if (toggle) {
+        toggle.textContent = `AI Responses: ${settings.enabled === false ? 'OFF' : 'ON'}`;
+        toggle.classList.toggle('on', settings.enabled !== false);
+      }
+      const understanding = document.getElementById('btnReactiveUnderstanding');
+      if (understanding) {
+        understanding.textContent = `Comment understanding: ${settings.understanding === false ? 'OFF' : 'ON'}`;
+        understanding.classList.toggle('on', settings.understanding !== false);
+      }
+      const orders = document.getElementById('btnReactiveOrders');
+      if (orders) {
+        orders.textContent = `Chat orders: ${settings.chatOrders === false ? 'OFF' : 'ON'}`;
+        orders.classList.toggle('on', settings.chatOrders !== false);
+      }
+      const llm = document.getElementById('btnReactiveLlm');
+      if (llm) {
+        llm.textContent = `LLM provider: ${settings.llmEnabled ? 'ON' : 'OFF'}`;
+        llm.classList.toggle('on', Boolean(settings.llmEnabled));
+      }
+      const providerEl = document.getElementById('reactiveProviderState');
+      if (providerEl) {
+        const status = provider.status || 'disabled';
+        providerEl.textContent = `${REACTIVE_STATUS_LABELS[status] || status.toUpperCase()}${provider.model ? ' · ' + provider.model : ''}`;
+        providerEl.style.background = status === 'ready' ? '#dff3e3' : status === 'disabled' ? '' : '#ffe0dd';
+      }
+      reactiveSetValue('reactiveLanguage', settings.language || 'en');
+      reactiveSetValue('reactiveDefaultSeller', settings.defaultSeller || 'alternate');
+      reactiveSetValue('reactiveViewerCooldown', settings.perViewerCooldown);
+      reactiveSetValue('reactiveGlobalCooldown', settings.globalCooldown);
+      reactiveSetValue('reactiveMaxLength', settings.maxResponseLength);
+      reactiveSetValue('reactiveConfidence', settings.confidenceThreshold);
+      reactiveSetValue('reactiveMaxPending', settings.maxPending);
+      reactiveSetValue('reactiveDedupe', settings.dedupeSeconds);
+      const activeProvider = document.getElementById('reactiveActiveProvider');
+      if (activeProvider) {
+        activeProvider.textContent = provider.name
+          ? `${provider.name} · ${provider.model || 'no model'} · ${provider.endpoint || provider.baseUrl || 'not configured'}`
+          : 'No LLM provider configured. Open LLM Provider Manager below.';
+      }
+      for (const [id, key] of [
+        ['rsReceived', 'received'],
+        ['rsUnderstood', 'understood'],
+        ['rsGenerated', 'generated'],
+        ['rsSpoken', 'spoken'],
+        ['rsIgnored', 'ignored'],
+        ['rsOrders', 'orders'],
+        ['rsFallback', 'fallbacks']
+      ]) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(Number(stats[key] || 0).toLocaleString('en-US'));
+      }
+      const providerNote = document.getElementById('reactiveProviderNote');
+      if (providerNote) {
+        const bits = [provider.name || provider.provider || 'no provider'];
+        if (provider.endpoint) bits.push(provider.endpoint);
+        else if (provider.baseUrl) bits.push(provider.baseUrl);
+        if (provider.keyConfigured) bits.push('key detected');
+        else bits.push('no API key');
+        if (provider.lastStatus) bits.push(`HTTP ${provider.lastStatus}`);
+        if (provider.lastError) bits.push(`Error: ${provider.lastError}`);
+        providerNote.textContent = bits.join(' · ');
+      }
+      const last = snapshot.lastResponse;
+      const lastEl = document.getElementById('reactiveLast');
+      if (lastEl) {
+        lastEl.innerHTML = last
+          ? `<div><strong>@${escapeHtml(last.user)}</strong> <span class="ann-cat">${escapeHtml(last.intent || '')}</span></div>
+             <div class="hint">“${escapeHtml(last.comment || '')}”</div>
+             <div>${escapeHtml(last.response || '')}</div>
+             <div class="hint">${escapeHtml(last.seller || '')} · ${escapeHtml(last.source || '')}${last.orderCreated ? ' · order created' : ''}${last.spoken ? ' · spoken' : ''}</div>`
+          : '<div class="hint">No reactive response yet.</div>';
+      }
+      const queueEl = document.getElementById('reactiveQueue');
+      const queueCount = document.getElementById('reactiveQueueCount');
+      const queue = Array.isArray(snapshot.queue) ? snapshot.queue : [];
+      if (queueCount) queueCount.textContent = `${queue.length} pending${snapshot.processing ? ' · 1 processing' : ''}`;
+      if (queueEl) {
+        const rows = [];
+        if (snapshot.processing) {
+          rows.push(`<div class="reactive-queue-row">⚙️ ${escapeHtml(snapshot.processing.user)}: ${escapeHtml(snapshot.processing.comment)} <span class="hint">${escapeHtml(snapshot.processing.intent)}</span></div>`);
+        }
+        for (const job of queue) {
+          rows.push(`<div class="reactive-queue-row">${Number(job.priority) || 0} · ${escapeHtml(job.user)}: ${escapeHtml(String(job.comment || '').slice(0, 70))} <span class="hint">${escapeHtml(job.intent || '')} · ${Math.round((job.ageMs || 0) / 1000)}s</span></div>`);
+        }
+        queueEl.innerHTML = rows.length ? rows.join('') : '<div class="hint">Queue is empty.</div>';
+      }
+    }
+
+    async function applyReactiveSettings(patch) {
+      const hint = document.getElementById('reactiveHint');
+      const data = await sendRpc('reactive.updateSettings', patch);
+      const result = data && data.result;
+      if (result && result.reactive) renderReactive(result.reactive);
+      if (hint) {
+        hint.textContent = result && result.ok
+          ? 'Reactive seller settings saved on the server.'
+          : 'Could not save reactive settings: ' + ((result && result.error) || (data && data.error && data.error.message) || 'unknown error');
+      }
+    }
+
+    function reactiveFormValues() {
+      return {
+        language: document.getElementById('reactiveLanguage').value,
+        defaultSeller: document.getElementById('reactiveDefaultSeller').value,
+        perViewerCooldown: Number(document.getElementById('reactiveViewerCooldown').value),
+        globalCooldown: Number(document.getElementById('reactiveGlobalCooldown').value),
+        maxResponseLength: Number(document.getElementById('reactiveMaxLength').value),
+        confidenceThreshold: Number(document.getElementById('reactiveConfidence').value),
+        maxPending: Number(document.getElementById('reactiveMaxPending').value),
+        dedupeSeconds: Number(document.getElementById('reactiveDedupe').value)
+      };
+    }
+
+    async function testReactiveProviderConnection() {
+      const button = document.getElementById('btnReactiveTestProvider');
+      const output = document.getElementById('reactiveProviderResult');
+      const hint = document.getElementById('reactiveHint');
+      const activeId = (llmUIState && llmUIState.activeProviderId) || (reactiveState && reactiveState.provider && reactiveState.provider.id);
+      if (!activeId) {
+        if (output) output.textContent = JSON.stringify({ ok: false, notTested: true, error: 'No provider configured.' }, null, 2);
+        if (hint) hint.textContent = 'Add a provider in LLM Provider Manager first.';
+        return;
+      }
+      if (button) button.disabled = true;
+      if (output) output.textContent = 'Sending a real structured request to the active provider…';
+      if (hint) hint.textContent = 'Testing the saved server-side provider configuration…';
+      const data = await sendRpc('llm.test', { id: activeId });
+      if (button) button.disabled = false;
+      const result = data && data.result;
+      if (!result) {
+        const error = data && data.error ? data.error : { error: 'No response' };
+        if (output) output.textContent = JSON.stringify(error, null, 2);
+        if (hint) hint.textContent = 'Provider connection test failed.';
+        return;
+      }
+      if (output) {
+        output.textContent = JSON.stringify(
+          {
+            ok: result.ok,
+            notTested: result.notTested,
+            message: result.message,
+            error: result.error,
+            httpStatus: result.httpStatus,
+            latencyMs: result.latencyMs,
+            model: result.model,
+            endpoint: result.endpoint,
+            sample: result.sample
+          },
+          null,
+          2
+        );
+      }
+      if (hint) {
+        hint.textContent = result.ok
+          ? 'Provider connection verified with a real structured request.'
+          : result.notTested
+            ? 'Provider not tested: ' + (result.error || 'missing configuration') + '.'
+            : 'Provider connection failed: ' + (result.error || 'unknown error') + '.';
+      }
+      if (result.llm) renderLlmManager(result.llm);
+      if (result.reactive) renderReactive(result.reactive);
+    }
+
+    async function testReactiveComment() {
+      const button = document.getElementById('btnReactiveTest');
+      const output = document.getElementById('reactiveTestResult');
+      const hint = document.getElementById('reactiveHint');
+      const user = document.getElementById('reactiveTestUser').value.trim() || 'Admin Test Viewer';
+      const comment = document.getElementById('reactiveTestComment').value.trim();
+      if (!comment) {
+        if (hint) hint.textContent = 'Type a sample comment first.';
+        return;
+      }
+      if (button) button.disabled = true;
+      if (output) output.textContent = 'Running comment classification, provider/fallback, validation and order pipeline…';
+      const data = await sendRpc('reactive.test', { user, comment });
+      if (button) button.disabled = false;
+      const result = data && data.result;
+      if (!result) {
+        if (output) output.textContent = JSON.stringify(data && data.error ? data.error : { error: 'No response' }, null, 2);
+        return;
+      }
+      if (output) {
+        output.textContent = JSON.stringify(
+          {
+            ok: result.ok,
+            ignored: result.ignored,
+            reason: result.reason,
+            intent: result.analysis && result.analysis.intent,
+            confidence: result.analysis && result.analysis.confidence,
+            source: result.source,
+            seller: result.seller,
+            response: result.response,
+            order: result.order,
+            fallbackReason: result.fallbackReason,
+            replyId: result.replyId
+          },
+          null,
+          2
+        );
+      }
+      if (hint) hint.textContent = result.ok ? 'Test reply sent to the live stage through the existing Piper queue.' : 'Test did not produce a response: ' + (result.reason || 'ignored') + '.';
+      if (result.reactive) renderReactive(result.reactive);
+    }
+
+    (function wireReactive() {
+      document.getElementById('btnReactiveToggle')?.addEventListener('click', () => {
+        applyReactiveSettings({ enabled: !(reactiveState && reactiveState.settings.enabled !== false) });
+      });
+      document.getElementById('btnReactiveUnderstanding')?.addEventListener('click', () => {
+        applyReactiveSettings({ understanding: !(reactiveState && reactiveState.settings.understanding !== false) });
+      });
+      document.getElementById('btnReactiveOrders')?.addEventListener('click', () => {
+        applyReactiveSettings({ chatOrders: !(reactiveState && reactiveState.settings.chatOrders !== false) });
+      });
+      document.getElementById('btnReactiveLlm')?.addEventListener('click', () => {
+        applyReactiveSettings({ llmEnabled: !(reactiveState && reactiveState.settings.llmEnabled) });
+      });
+      document.getElementById('btnReactiveSave')?.addEventListener('click', () => applyReactiveSettings(reactiveFormValues()));
+      document.getElementById('btnReactiveTestProvider')?.addEventListener('click', testReactiveProviderConnection);
+      document.getElementById('btnReactiveTest')?.addEventListener('click', testReactiveComment);
+      document.getElementById('btnReactiveResetStats')?.addEventListener('click', async () => {
+        if (!confirm('Reset live reactive seller statistics?')) return;
+        const data = await sendRpc('reactive.resetStats');
+        if (data && data.result && data.result.reactive) renderReactive(data.result.reactive);
+      });
     })();
 
     // ------------------------------------------------------- shop announcer

@@ -9,6 +9,11 @@ public/assets/bg_chant.m4a
 .freebuff
 .env
 .env.example
+data/llm-secrets.json
+data/llm-health.json
+data/*.tmp
+data/llm-secrets.json.*.tmp
+data/llm-health.json.*.tmp
 __pycache__/
 backup/
 config/piper/

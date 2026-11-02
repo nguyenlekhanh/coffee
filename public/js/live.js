@@ -76,6 +76,13 @@
       })
     : null;
   window.shopConversations = conversations;
+
+  // Validated TikTok comment replies. The server decides; this stage module
+  // only speaks them through the shared audio queue and reports playback.
+  const reactive = window.ShopReactiveSeller
+    ? new window.ShopReactiveSeller({ audio, announcer, conversations })
+    : null;
+  window.shopReactive = reactive;
   window.addEventListener('error', (e) => console.error('[ShopError]', e.message));
 
   let rpcId = 1;
@@ -384,7 +391,9 @@
       case 'serveDrink':
         return `🥤 <strong>${escapeHtml(ev.user)}</strong> got ${escapeHtml(ev.drink ? ev.drink.name : 'a drink')} (${money(ev.tip)})`;
       case 'commentOrder':
-        return `💬 <strong>${escapeHtml(ev.user)}</strong>: “${escapeHtml(ev.message || ev.drink ? ev.drink.name : '')}”`;
+        return `💬 <strong>${escapeHtml(ev.user)}</strong>: “${escapeHtml(ev.message || (ev.drink ? ev.drink.name : ''))}”`;
+      case 'reactiveReply':
+        return `💬 <strong>${escapeHtml(ev.user)}</strong>: “${escapeHtml(String(ev.comment || '').slice(0, 70))}” → ${escapeHtml(String(ev.ttsText || '').slice(0, 90))}`;
       case 'likeBurst':
         return `❤️ <strong>${escapeHtml(ev.user)}</strong> sent ${ev.count} likes`;
       case 'followGuest':
@@ -445,6 +454,7 @@
       if (conversations && st.voiceProfiles) conversations.setVoiceProfiles(st.voiceProfiles);
       if (conversations && st.conversations) conversations.applySnapshot(st.conversations);
       if (conversations) conversations.setPaused(Boolean(st.settings.paused) || st.settings.running === false);
+      if (reactive && st.reactive) reactive.applySnapshot(st.reactive);
       const ttsBtn = $('btnToggleTts');
       if (ttsBtn) {
         ttsBtn.textContent = `🎙️ Voice: ${audio.ttsEnabled ? 'ON' : 'OFF'}`;
@@ -537,6 +547,23 @@
 
   function handleServerEvent(ev) {
     if (!ev) return;
+    if (ev.type === 'reactiveReply' && reactive) {
+      reactive.handleReply(ev);
+      game.handleEvent({
+        ...ev,
+        type: ev.orderCreated ? 'commentOrder' : 'viewerComment',
+        bubbleText: ev.bubbleText || ev.comment || ''
+      });
+      if (ev.orderCreated) {
+        audio.playServiceBell();
+        fx.sparkle(742, 1060, 10);
+      } else {
+        audio.playCupClink();
+        fx.sparkle(700, 1020, 6);
+      }
+      updateHud();
+      return;
+    }
     if (ev.test) {
       handleTestEvent(ev);
       return;

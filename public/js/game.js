@@ -892,6 +892,12 @@
           });
           break;
         }
+        case 'viewerComment': {
+          const text = String(ev.bubbleText || ev.comment || ev.message || 'Hello!').slice(0, 110);
+          character.bubble = { text, timer: 3200 };
+          this.react(character, '💬', 1.4);
+          break;
+        }
         case 'giftOrder':
         case 'partyOrder': {
           const units = Math.max(1, Number(ev.units || ev.count || ev.groupSize) || 1);
