@@ -1559,12 +1559,20 @@
       ctx.restore();
 
       if (customer.cupInHand && customer.drink && this.sprites.drinks.length) {
-        const s = customer.drink.sprite;
-        const cupH = 50 * scale;
-        const cupW = cupH * (s.w / s.h);
-        const cupX = customer.x + customer.facing * 30 * scale;
-        const cupY = feetY - 132 * scale;
-        ctx.drawImage(s.canvas, cupX - cupW / 2, cupY - cupH / 2, cupW, cupH);
+        // A drink restored from server state may arrive without a loaded sprite,
+        // so fall back to the sprite for its id instead of crashing the render loop.
+        const fallback = this.sprites.drinks.find((d) => d.meta && d.meta.id === customer.drink.id);
+        const s =
+          customer.drink.sprite && customer.drink.sprite.w && customer.drink.sprite.h
+            ? customer.drink.sprite
+            : fallback && fallback.sprite;
+        if (s && s.w && s.h && s.canvas) {
+          const cupH = 50 * scale;
+          const cupW = cupH * (s.w / s.h);
+          const cupX = customer.x + customer.facing * 30 * scale;
+          const cupY = feetY - 132 * scale;
+          ctx.drawImage(s.canvas, cupX - cupW / 2, cupY - cupH / 2, cupW, cupH);
+        }
       }
 
       const vipLevel = customer.vipLevel || 0;

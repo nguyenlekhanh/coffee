@@ -220,6 +220,24 @@ never replaced, and session levels reset when a new live session starts.
   the top 3, with test buttons (`shop.testVip`, `shop.testCelebration`) that
   replay the real visuals without touching leaderboard or session coins.
 
+## 📡 TikTok LIVE connection
+
+Both the stage dock and the admin panel show the live connection state
+(`DISCONNECTED`, `CONNECTING...`, `CONNECTED`, `RECONNECTING...`, `CONNECTION ERROR`) with the
+username, connection duration, viewer count and the last received LIVE event.
+
+- Enter the account exactly as in the TikTok app (`@username` or `username`); a full
+  `tiktok.com/@username/live` link also works.
+- The server checks liveness before opening the websocket, so an offline account reports
+  "`@user` is not LIVE right now" instead of a generic failure.
+- A second Connect click while a connection is opening is rejected instead of starting a
+  parallel attempt, and a dropped connection retries automatically (5 attempts, growing
+  backoff) while reporting `RECONNECTING...`.
+- `tiktok-live-connector` v2 signs websocket requests through Euler Stream. If the log shows
+  *"This endpoint requires a Business plan"*, set `EULER_API_KEY` (or `TIKTOK_SIGN_API_KEY`)
+  in the environment; the server passes it as `signApiKey`. Without such a key TikTok LIVE
+  events cannot be received, and the UI reports that exact error.
+
 ## 📣 Automatic Shop Announcer
 
 A context-aware announcer keeps the stream talking even when nobody interacts.

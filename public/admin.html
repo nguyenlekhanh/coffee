@@ -116,6 +116,14 @@
     }
     .ann-vi { color: var(--ink-soft); font-weight: 600; font-size: 12px; }
     .ann-toggle { padding-top: 2px; }
+    .tt-state {
+      display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.8px;
+      padding: 4px 10px; border-radius: 8px; background: rgba(59, 42, 32, 0.12); color: var(--ink-soft);
+    }
+    .tt-state.pending { background: #fdf0c9; color: #8a6d13; }
+    .tt-state.connected { background: #dff3e3; color: #1f7a3d; }
+    .tt-state.error { background: #ffe0dd; color: #b3261e; }
+    #ttError { color: #b3261e; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -153,11 +161,16 @@
       <section class="card">
         <h2>📡 2. TikTok Live Connection</h2>
         <div class="row">
-          <input type="text" id="ttUser" placeholder="@username or live link" value="@zenfacts_vn" />
+          <input type="text" id="ttUser" placeholder="@username or live link" value="@tinytails99" />
           <button class="btn gold" id="btnConn">Connect</button>
           <button class="btn" id="btnDisc">Disconnect</button>
         </div>
         <button class="btn" id="btnAutoSim">🤖 Auto Demo Interactions: OFF</button>
+        <div class="row">
+          <span class="tt-state" id="ttState">DISCONNECTED</span>
+          <div class="hint" id="ttMeta" style="flex: 1; margin: 0">No TikTok LIVE connection.</div>
+        </div>
+        <div class="hint" id="ttError"></div>
         <div class="hint" id="tiktokHint">Follow, like, comment and gift events are mapped onto shop interactions.</div>
         <div class="hint">
           Event → gameplay: <strong>Follow</strong> = VIP free drink · <strong>Like</strong> = crowd rush ·
@@ -461,9 +474,23 @@
       sendRpc('game.setSpawnRate', { rate: Number(e.target.value) / 100 });
     };
 
-    document.getElementById('btnConn').onclick = () => {
+    document.getElementById('btnConn').onclick = async () => {
       const username = document.getElementById('ttUser').value.trim();
-      sendRpc('live.connect', { username });
+      const btn = document.getElementById('btnConn');
+      const errorEl = document.getElementById('ttError');
+      if (!username) {
+        errorEl.textContent = 'Enter a TikTok @username first.';
+        return;
+      }
+      btn.disabled = true;
+      errorEl.textContent = `CONNECTING to ${username}…`;
+      const data = await sendRpc('live.connect', { username });
+      btn.disabled = false;
+      if (data && data.error) {
+        errorEl.textContent = 'CONNECTION ERROR: ' + data.error.message;
+      } else {
+        errorEl.textContent = '';
+      }
     };
     document.getElementById('btnDisc').onclick = () => sendRpc('live.disconnect');
     let autoSimOn = false;
@@ -560,6 +587,71 @@
 
     document.getElementById('btnRefresh').onclick = refreshStatus;
 
+    let lastAdminState = null;
+
+    function ttFormatDuration(ms) {
+      const total = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const sec = total % 60;
+      if (h) return `${h}h ${String(m).padStart(2, '0')}m`;
+      if (m) return `${m}m ${String(sec).padStart(2, '0')}s`;
+      return `${sec}s`;
+    }
+
+    function renderTikTokStatus(st) {
+      if (st) lastAdminState = st;
+      const source = lastAdminState || {};
+      const t = source.tiktok || {};
+      const label = t.connected
+        ? 'CONNECTED'
+        : t.connecting
+          ? 'CONNECTING...'
+          : t.reconnecting
+            ? 'RECONNECTING...'
+            : t.status === 'error' || t.lastError
+              ? 'CONNECTION ERROR'
+              : 'DISCONNECTED';
+      const stateEl = document.getElementById('ttState');
+      stateEl.textContent = label;
+      stateEl.className =
+        'tt-state' +
+        (t.connected
+          ? ' connected'
+          : t.connecting || t.reconnecting
+            ? ' pending'
+            : label === 'CONNECTION ERROR'
+              ? ' error'
+              : '');
+
+      let meta;
+      if (t.connected) {
+        const parts = [`@${t.username}`];
+        parts.push(`LIVE ${ttFormatDuration(t.durationMs)}`);
+        parts.push(`${t.viewerCount || 0} viewers`);
+        const ev = t.lastEvent;
+        parts.push(
+          ev
+            ? `last event: ${ev.type} @${ev.user}${ev.detail ? ' · ' + ev.detail : ''}`
+            : 'waiting for the first LIVE event…'
+        );
+        meta = parts.join(' · ');
+      } else if (t.connecting) {
+        meta = `Opening the TikTok LIVE stream for @${t.username || '…'}…`;
+      } else if (t.reconnecting) {
+        meta = t.lastError || 'Reconnecting to TikTok LIVE…';
+      } else if (label === 'CONNECTION ERROR') {
+        meta = t.lastError || 'Connection failed.';
+      } else {
+        meta = 'No TikTok LIVE connection.';
+      }
+      document.getElementById('ttMeta').textContent = meta;
+      document.getElementById('ttError').textContent = label === 'CONNECTION ERROR' ? t.lastError || '' : '';
+      document.getElementById('btnConn').disabled = Boolean(t.connecting);
+    }
+
+    setInterval(() => renderTikTokStatus(), 1000);
+
     async function refreshStatus() {
       try {
         const res = await fetch('/api/state');
@@ -582,11 +674,7 @@
           ? 'Paused · customers wait where they are.'
           : 'Running · the queue, tables and drink service are simulated in the browser.';
 
-        document.getElementById('tiktokHint').textContent = st.tiktok.connected
-          ? `Connected to @${st.tiktok.username} · ${st.tiktok.viewerCount || 0} viewers`
-          : st.tiktok.lastError
-            ? 'Last connection error: ' + st.tiktok.lastError
-            : 'Not connected. Enter a live TikTok @username to listen for events.';
+        renderTikTokStatus(st);
 
         if (st.tts) {
           ttsVoices = Array.isArray(st.tts.voices) ? st.tts.voices : [];

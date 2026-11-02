@@ -1,14 +1,42 @@
 {
-  "customersServed": 0,
-  "drinksSold": 0,
-  "totalTips": 0,
-  "likes": 0,
-  "follows": 0,
-  "comments": 0,
-  "gifts": 0,
-  "totalCoins": 0,
-  "recentGifts": [],
-  "supporters": {},
+  "customersServed": 9,
+  "drinksSold": 9,
+  "totalTips": 32.75,
+  "likes": 1,
+  "follows": 1,
+  "comments": 1,
+  "gifts": 2,
+  "totalCoins": 25,
+  "recentGifts": [
+    {
+      "id": "gift_1793603350799_44ek",
+      "user": "Smoke",
+      "uniqueId": "smoke.a",
+      "avatar": "",
+      "giftId": "coin_25",
+      "giftName": "25-coin gift",
+      "giftIcon": "/assets/gift_icon/grandCeremony.webp",
+      "giftCoins": 25,
+      "coins": 25,
+      "units": 1,
+      "drinkId": "lemonade",
+      "drinkName": "Fresh Lemonade",
+      "drinkImage": "/assets/drinks/Lemonade.jpg",
+      "at": "2026-11-02T07:09:10.799Z"
+    }
+  ],
+  "supporters": {
+    "smoke.a": {
+      "name": "Smoke",
+      "uniqueId": "smoke.a",
+      "avatar": "",
+      "tips": 32.75,
+      "coins": 25,
+      "drinks": 9,
+      "gifts": 2,
+      "lastNote": "Gift: Drink Party Tray"
+    }
+  },
   "settings": {
     "running": true,
     "paused": false,

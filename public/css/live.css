@@ -823,6 +823,26 @@ body.stacked .quick-dock {
   gap: 8px;
 }
 
+.dock-live-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(59, 42, 32, 0.06);
+  border: 2px solid rgba(59, 42, 32, 0.12);
+}
+.dock-live-state {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #6b5a4d;
+}
+.dock-live-state.connected { color: #1f7a3d; }
+.dock-live-state.pending { color: #a97c12; }
+.dock-live-state.error { color: #b3261e; }
 .dock-note {
   font-size: 12.5px;
   font-weight: 700;

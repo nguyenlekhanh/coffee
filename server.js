@@ -529,9 +529,14 @@ const DEFAULT_STATE = {
   tiktok: {
     connected: false,
     connecting: false,
-    username: process.env.TIKTOK_USER || 'zenfacts_vn',
+    reconnecting: false,
+    status: 'disconnected',
+    username: process.env.TIKTOK_USER || '',
     roomId: null,
     viewerCount: 0,
+    connectedAt: null,
+    attempts: 0,
+    lastEvent: null,
     lastError: null
   }
 };
@@ -1026,7 +1031,7 @@ function getPublicState() {
     },
     recentEvents: state.recentEvents.slice(0, 12),
     settings: state.settings,
-    tiktok: state.tiktok,
+    tiktok: tiktokSnapshot(),
     tts: piperTts.getStatus()
   };
 }
@@ -1775,58 +1780,222 @@ function extractUserFromEvent(data) {
   return { user, uniqueId, avatar };
 }
 
-async function connectTikTokLive(usernameOrUrl) {
-  const cleanUser = await resolveTikTokUsername(usernameOrUrl);
-  if (!cleanUser) {
-    throw new Error('No valid @username found in that input');
+const TIKTOK_RECONNECT_MAX = 5;
+let tiktokReconnectTimer = null;
+let tiktokManualClose = false;
+
+function tiktokErrorText(err) {
+  if (!err) return 'Unknown TikTok connection error';
+  if (typeof err === 'string') return err;
+  const candidates = [err.message, err.info, err.reason, err.code, err.cause && err.cause.message];
+  const parts = [];
+  for (const value of candidates) {
+    if (!value) continue;
+    const text = typeof value === 'string' ? value : JSON.stringify(value);
+    if (text && !parts.includes(text)) parts.push(text);
   }
+  const text = (parts.join(' · ') || String(err))
+    .replace(/Â·/g, '·')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > 400 ? `${text.slice(0, 397)}…` : text;
+}
+
+function tiktokSnapshot() {
+  const t = state.tiktok || {};
+  const connected = Boolean(t.connected);
+  return {
+    connected,
+    connecting: Boolean(t.connecting),
+    reconnecting: Boolean(t.reconnecting),
+    status: t.status || (connected ? 'connected' : 'disconnected'),
+    username: t.username || '',
+    roomId: t.roomId || null,
+    viewerCount: Number(t.viewerCount) || 0,
+    connectedAt: t.connectedAt || null,
+    durationMs: t.connectedAt ? Math.max(0, Date.now() - t.connectedAt) : 0,
+    attempts: Number(t.attempts) || 0,
+    lastEvent: t.lastEvent || null,
+    lastError: t.lastError || null
+  };
+}
+
+function setTikTokState(patch, options = {}) {
+  state.tiktok = { ...state.tiktok, ...patch };
+  if (options.broadcast !== false) broadcastNotification('temple.state', getPublicState());
+  return tiktokSnapshot();
+}
+
+function scheduleTikTokReconnect() {
+  if (tiktokManualClose) return;
+  const attempts = (Number(state.tiktok.attempts) || 0) + 1;
+  if (attempts > TIKTOK_RECONNECT_MAX) {
+    setTikTokState({
+      connected: false,
+      connecting: false,
+      reconnecting: false,
+      status: 'error',
+      attempts,
+      connectedAt: null,
+      lastError: 'TikTok LIVE connection was lost and could not be restored. Press Connect to try again.'
+    });
+    console.warn('[TikTok Reconnect] Giving up after', TIKTOK_RECONNECT_MAX, 'attempts');
+    return;
+  }
+  const delay = Math.min(30000, 4000 * attempts);
+  setTikTokState({
+    connected: false,
+    connecting: false,
+    reconnecting: true,
+    status: 'reconnecting',
+    attempts,
+    connectedAt: null,
+    lastError: `Connection lost. Reconnecting in ${Math.round(delay / 1000)}s (attempt ${attempts}/${TIKTOK_RECONNECT_MAX})…`
+  });
+  tiktokReconnectTimer = setTimeout(() => {
+    tiktokReconnectTimer = null;
+    const target = state.tiktok.username;
+    if (!target || tiktokManualClose) return;
+    connectTikTokLive(target, { auto: true }).catch((err) => {
+      console.warn('[TikTok Reconnect] Attempt failed:', tiktokErrorText(err));
+    });
+  }, delay);
+}
+
+async function connectTikTokLive(rawInput, options = {}) {
+  // A second click must never start a parallel connection attempt.
+  if (state.tiktok.connecting) {
+    throw new Error(`Already connecting to @${state.tiktok.username || 'TikTok'}. Wait for that attempt to finish.`);
+  }
+
+  const cleanUser = await resolveTikTokUsername(rawInput);
+  if (!/^[A-Za-z0-9._]{2,32}$/.test(cleanUser)) {
+    const message = `"${cleanUser}" is not a valid TikTok username. Use the @username exactly as it appears in the TikTok app.`;
+    setTikTokState({
+      connected: false,
+      connecting: false,
+      reconnecting: false,
+      status: 'error',
+      connectedAt: null,
+      lastError: message
+    });
+    throw new Error(message);
+  }
+
+  if (tiktokReconnectTimer) {
+    clearTimeout(tiktokReconnectTimer);
+    tiktokReconnectTimer = null;
+  }
+  tiktokManualClose = false;
 
   if (tiktokConn) {
     try {
-      await tiktokConn.disconnect();
+      if (typeof tiktokConn.removeAllListeners === 'function') tiktokConn.removeAllListeners();
+      await Promise.resolve(tiktokConn.disconnect()).catch(() => {});
     } catch (_) {}
     tiktokConn = null;
   }
 
-  state.tiktok = {
+  setTikTokState({
     connected: false,
     connecting: true,
+    reconnecting: false,
+    status: 'connecting',
     username: cleanUser,
     roomId: null,
     viewerCount: 0,
-    lastError: null
-  };
-  broadcastNotification('temple.state', getPublicState());
+    connectedAt: null,
+    lastError: null,
+    lastEvent: options.auto ? state.tiktok.lastEvent : null,
+    attempts: options.auto ? Number(state.tiktok.attempts) || 0 : 0
+  });
+  console.log(`[TikTok Live] Connecting to @${cleanUser}…`);
 
-  tiktokConn = new TikTokLiveConnection(cleanUser, {
+  const signApiKey = process.env.EULER_API_KEY || process.env.TIKTOK_SIGN_API_KEY || undefined;
+  // enableExtendedGiftInfo triggers Euler Stream's premium gift-gallery route,
+  // which rejects the connection with "This endpoint requires a Business plan".
+  // Gift coin values still arrive on data.gift.diamondCount, so it is not needed.
+  const connOptions = {
     processInitialData: true,
     fetchRoomInfoOnConnect: false,
-    enableExtendedGiftInfo: true
-  });
+    enableExtendedGiftInfo: false
+  };
+  if (signApiKey) connOptions.signApiKey = signApiKey;
 
-  tiktokConn.on(ControlEvent.CONNECTED, (roomState) => {
-    state.tiktok.connected = true;
-    state.tiktok.connecting = false;
-    state.tiktok.roomId = roomState?.roomId || tiktokConn?.roomId || null;
-    state.tiktok.lastError = null;
+  tiktokConn = new TikTokLiveConnection(cleanUser, connOptions);
+  const conn = tiktokConn;
+
+  const safeOn = (eventName, handler) => {
+    if (!eventName) return;
+    conn.on(eventName, (...args) => {
+      try {
+        handler(...args);
+      } catch (err) {
+        console.warn('[TikTok Handler Warning]', tiktokErrorText(err));
+      }
+    });
+  };
+
+  const recordEvent = (type, data, detail = '') => {
+    const { user, uniqueId } = extractUserFromEvent(data || {});
+    state.tiktok.lastEvent = {
+      type,
+      user: user || uniqueId || 'viewer',
+      uniqueId: uniqueId || '',
+      detail: String(detail || '').slice(0, 120),
+      at: Date.now()
+    };
+  };
+
+  safeOn(ControlEvent.CONNECTED, (roomState) => {
+    setTikTokState({
+      connected: true,
+      connecting: false,
+      reconnecting: false,
+      status: 'connected',
+      roomId: roomState?.roomId || conn.roomId || null,
+      connectedAt: Date.now(),
+      attempts: 0,
+      lastError: null
+    });
     console.log(`[TikTok Live] Connected to @${cleanUser} (roomId: ${state.tiktok.roomId})`);
-    broadcastNotification('temple.state', getPublicState());
   });
 
-  tiktokConn.on(ControlEvent.DISCONNECTED, () => {
-    state.tiktok.connected = false;
-    state.tiktok.connecting = false;
+  safeOn(ControlEvent.DISCONNECTED, () => {
+    const wasConnected = Boolean(state.tiktok.connected);
     console.log(`[TikTok Live] Disconnected from @${cleanUser}`);
-    broadcastNotification('temple.state', getPublicState());
+    if (tiktokManualClose) {
+      setTikTokState({
+        connected: false,
+        connecting: false,
+        reconnecting: false,
+        status: 'disconnected',
+        connectedAt: null,
+        roomId: null,
+        viewerCount: 0
+      });
+      return;
+    }
+    if (wasConnected || state.tiktok.status === 'connected') {
+      setTikTokState({ connected: false, connectedAt: null, roomId: null, viewerCount: 0 });
+      scheduleTikTokReconnect();
+      return;
+    }
+    setTikTokState({
+      connected: false,
+      connecting: false,
+      reconnecting: false,
+      status: state.tiktok.status === 'error' ? 'error' : 'disconnected'
+    });
   });
 
-  tiktokConn.on(ControlEvent.ERROR, (err) => {
-    state.tiktok.lastError = err?.message || String(err);
-    console.warn('[TikTok Live Warning]', state.tiktok.lastError);
-    broadcastNotification('temple.state', getPublicState());
+  safeOn(ControlEvent.ERROR, (err) => {
+    const message = tiktokErrorText(err);
+    console.warn('[TikTok Live Warning]', message);
+    setTikTokState({ lastError: message });
   });
 
-  tiktokConn.on(WebcastEvent.ROOM_USER, (data) => {
+  safeOn(WebcastEvent.ROOM_USER, (data) => {
     const viewerCount = Number(data?.total ?? data?.viewerCount ?? 0);
     if (viewerCount > 0) {
       state.tiktok.viewerCount = viewerCount;
@@ -1834,31 +2003,35 @@ async function connectTikTokLive(usernameOrUrl) {
     }
   });
 
-  tiktokConn.on(WebcastEvent.MEMBER, (data) => {
+  safeOn(WebcastEvent.MEMBER, (data) => {
     const { user, uniqueId, avatar } = extractUserFromEvent(data);
+    recordEvent('MEMBER', data);
     Actions.viewerJoin({ user, uniqueId, avatar });
   });
 
-  tiktokConn.on(WebcastEvent.CHAT, (data) => {
+  safeOn(WebcastEvent.CHAT, (data) => {
     const { user, uniqueId, avatar } = extractUserFromEvent(data);
     const commentText = data?.content || data?.comment || '';
+    recordEvent('CHAT', data, commentText);
     console.log(`[TikTok Chat] ${user}: ${commentText}`);
     parseViewerComment(commentText, user, uniqueId, avatar);
   });
 
-  tiktokConn.on(WebcastEvent.LIKE, (data) => {
+  safeOn(WebcastEvent.LIKE, (data) => {
     const { user, uniqueId, avatar } = extractUserFromEvent(data);
     const likeCount = Math.min(15, Math.max(1, Number(data?.count ?? data?.likeCount ?? 1)));
+    recordEvent('LIKE', data, `${likeCount} likes`);
     Actions.likeBurst({ user, uniqueId, avatar, count: likeCount });
   });
 
   const handleFollow = (data) => {
     const { user, uniqueId, avatar } = extractUserFromEvent(data);
+    recordEvent('FOLLOW', data);
     Actions.followGuest({ user, uniqueId, avatar, readTts: false });
   };
-  tiktokConn.on(WebcastEvent.FOLLOW, handleFollow);
-  tiktokConn.on(WebcastEvent.SHARE, handleFollow);
-  tiktokConn.on(WebcastEvent.SOCIAL, (data) => {
+  safeOn(WebcastEvent.FOLLOW, handleFollow);
+  safeOn(WebcastEvent.SHARE, handleFollow);
+  safeOn(WebcastEvent.SOCIAL, (data) => {
     const action = String(data?.action || '');
     const disp = String(data?.common?.displayText?.displayType || data?.displayType || '').toLowerCase();
     if (action === '1' || action === '3' || disp.includes('follow') || disp.includes('share')) {
@@ -1866,7 +2039,7 @@ async function connectTikTokLive(usernameOrUrl) {
     }
   });
 
-  tiktokConn.on(WebcastEvent.GIFT, (data) => {
+  safeOn(WebcastEvent.GIFT, (data) => {
     const { user, uniqueId, avatar } = extractUserFromEvent(data);
     const giftObj = data?.gift || data?.giftDetails || {};
     const giftId = String(data?.giftId || giftObj?.id || 'cup');
@@ -1904,6 +2077,7 @@ async function connectTikTokLive(usernameOrUrl) {
     const rawGiftId = data?.giftId || giftObj?.id || giftObj?.giftId || rawGiftName;
     const tier = coinTier(giftCoins);
     const displayGiftName = deltaCount > 1 ? `${deltaCount}x ${rawGiftName}` : rawGiftName;
+    recordEvent('GIFT', data, displayGiftName);
 
     if (!tier) {
       console.log(
@@ -1927,34 +2101,90 @@ async function connectTikTokLive(usernameOrUrl) {
     });
   });
 
+  // Check liveness first: it turns TikTok's opaque signing error into a clear
+  // "account is not live" message and avoids pointless websocket attempts.
+  let liveCheck = null;
   try {
-    const roomState = await tiktokConn.connect();
-    state.tiktok.connected = true;
-    state.tiktok.connecting = false;
-    state.tiktok.roomId = roomState?.roomId || tiktokConn?.roomId || null;
-    broadcastNotification('temple.state', getPublicState());
-    return state.tiktok;
+    liveCheck = await conn.fetchIsLive();
   } catch (err) {
-    state.tiktok.connected = false;
-    state.tiktok.connecting = false;
-    state.tiktok.lastError = err?.message || 'Could not connect (is that account live right now?)';
-    broadcastNotification('temple.state', getPublicState());
+    console.warn('[TikTok Live] Liveness check failed:', tiktokErrorText(err));
+  }
+
+  if (liveCheck === false) {
+    const message = `@${cleanUser} is not LIVE right now. Start a TikTok LIVE on that account, then press Connect again.`;
+    try {
+      if (typeof conn.removeAllListeners === 'function') conn.removeAllListeners();
+      await Promise.resolve(conn.disconnect()).catch(() => {});
+    } catch (_) {}
+    if (tiktokConn === conn) tiktokConn = null;
+    setTikTokState({
+      connected: false,
+      connecting: false,
+      reconnecting: false,
+      status: 'error',
+      connectedAt: null,
+      viewerCount: 0,
+      lastError: message
+    });
+    throw new Error(message);
+  }
+
+  try {
+    const roomState = await conn.connect();
+    setTikTokState({
+      connected: true,
+      connecting: false,
+      reconnecting: false,
+      status: 'connected',
+      roomId: roomState?.roomId || conn.roomId || null,
+      connectedAt: state.tiktok.connectedAt || Date.now(),
+      attempts: 0,
+      lastError: null
+    });
+    return tiktokSnapshot();
+  } catch (err) {
+    const message = tiktokErrorText(err);
+    const offline = /not live|isn't online|is not online|offline/i.test(message);
+    setTikTokState({
+      connected: false,
+      connecting: false,
+      reconnecting: false,
+      status: 'error',
+      connectedAt: null,
+      lastError: offline
+        ? `@${cleanUser} is not LIVE right now. Start a TikTok LIVE on that account, then press Connect again.`
+        : message
+    });
+    if (options.auto && !offline && !tiktokManualClose) scheduleTikTokReconnect();
     throw new Error(state.tiktok.lastError);
   }
 }
 
 function disconnectTikTokLive() {
+  tiktokManualClose = true;
+  if (tiktokReconnectTimer) {
+    clearTimeout(tiktokReconnectTimer);
+    tiktokReconnectTimer = null;
+  }
   if (tiktokConn) {
+    const conn = tiktokConn;
     try {
-      tiktokConn.disconnect();
+      if (typeof conn.removeAllListeners === 'function') conn.removeAllListeners();
+      Promise.resolve(conn.disconnect()).catch(() => {});
     } catch (_) {}
     tiktokConn = null;
   }
-  state.tiktok.connected = false;
-  state.tiktok.connecting = false;
-  state.tiktok.viewerCount = 0;
-  broadcastNotification('temple.state', getPublicState());
-  return state.tiktok;
+  setTikTokState({
+    connected: false,
+    connecting: false,
+    reconnecting: false,
+    status: 'disconnected',
+    roomId: null,
+    viewerCount: 0,
+    connectedAt: null,
+    attempts: 0
+  });
+  return tiktokSnapshot();
 }
 
 // ============================================================================
@@ -2134,6 +2364,9 @@ async function handleRpcCall(method, params = {}) {
     case 'live.disconnect':
       return disconnectTikTokLive();
 
+    case 'live.status':
+      return tiktokSnapshot();
+
     case 'live.setAutoSim':
       configureAutoSim(Boolean(params.enabled));
       saveState();
@@ -2251,9 +2484,9 @@ server.listen(PORT, () => {
   console.log(`🔌 WebSocket              : ws://localhost:${PORT}/ws`);
   console.log('============================================================');
 
-  const defaultChannel = process.env.TIKTOK_USER || state.tiktok?.username;
+  const defaultChannel = process.env.TIKTOK_USER || '';
   if (defaultChannel) {
-    connectTikTokLive(defaultChannel).catch((err) => {
+    connectTikTokLive(defaultChannel, { auto: true }).catch((err) => {
       console.warn(`[Auto-Connect @${defaultChannel}] Not connected yet:`, err.message);
     });
   }

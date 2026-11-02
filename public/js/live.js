@@ -63,6 +63,7 @@
 
   let rpcId = 1;
   let ws = null;
+  const pendingRpc = new Map();
   let autoSim = false;
   let mysteryTimer = null;
   let partyTimer = null;
@@ -106,22 +107,83 @@
   }
   setInterval(updateHud, 400);
 
+  let liveSnapshot = null;
+
+  function formatLiveDuration(ms) {
+    const total = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    if (hours) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+    if (minutes) return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+    return `${seconds}s`;
+  }
+
+  function liveStatusLabel(tiktok) {
+    if (tiktok.connected) return 'CONNECTED';
+    if (tiktok.connecting) return 'CONNECTING...';
+    if (tiktok.reconnecting) return 'RECONNECTING...';
+    if (tiktok.status === 'error' || tiktok.lastError) return 'CONNECTION ERROR';
+    return 'DISCONNECTED';
+  }
+
   function setLiveStatus(st) {
+    if (st !== undefined) liveSnapshot = st;
+    const tiktok = (liveSnapshot && liveSnapshot.tiktok) || {};
+    const label = liveStatusLabel(tiktok);
+    const stateEl = $('tiktokState');
+    const metaEl = $('tiktokMeta');
     const dot = $('liveDot');
-    const text = $('liveStatusText');
-    if (!dot || !text) return;
-    const tiktok = st && st.tiktok ? st.tiktok : {};
+    const header = $('liveStatusText');
+
+    if (stateEl) {
+      stateEl.textContent = label;
+      stateEl.className =
+        'dock-live-state' +
+        (label === 'CONNECTED'
+          ? ' connected'
+          : label === 'DISCONNECTED'
+            ? ''
+            : label === 'CONNECTION ERROR'
+              ? ' error'
+              : ' pending');
+    }
+    if (dot) dot.classList.toggle('connected', Boolean(tiktok.connected));
+
+    let meta;
     if (tiktok.connected) {
-      dot.classList.add('connected');
-      text.textContent = `LIVE @${tiktok.username || 'shop'} · ${tiktok.viewerCount || 0} VIEWERS`;
+      const parts = [`@${tiktok.username}`];
+      parts.push(`LIVE ${formatLiveDuration(tiktok.durationMs)}`);
+      parts.push(`${tiktok.viewerCount || 0} viewers`);
+      const ev = tiktok.lastEvent;
+      parts.push(
+        ev
+          ? `last event: ${ev.type} @${ev.user}${ev.detail ? ' · ' + ev.detail : ''}`
+          : 'waiting for the first LIVE event…'
+      );
+      meta = parts.join(' · ');
     } else if (tiktok.connecting) {
-      dot.classList.remove('connected');
-      text.textContent = `CONNECTING @${tiktok.username || ''}…`;
+      meta = `Opening the TikTok LIVE stream for @${tiktok.username || '…'}…`;
+    } else if (tiktok.reconnecting) {
+      meta = tiktok.lastError || 'Reconnecting to TikTok LIVE…';
+    } else if (tiktok.status === 'error' || tiktok.lastError) {
+      meta = tiktok.lastError || 'Connection failed.';
     } else {
-      dot.classList.remove('connected');
-      text.textContent = 'DEMO MODE · TIKTOK OFFLINE';
+      meta = 'Enter a live TikTok @username and press Connect.';
+    }
+
+    if (metaEl) metaEl.textContent = meta;
+    if (header) {
+      header.textContent = tiktok.connected
+        ? `LIVE @${tiktok.username} · ${tiktok.viewerCount || 0} VIEWERS`
+        : label === 'DISCONNECTED'
+          ? 'DEMO MODE · TIKTOK OFFLINE'
+          : `${label}${tiktok.username ? ' @' + tiktok.username : ''}`;
     }
   }
+
+  // Keeps the connection duration ticking between server broadcasts.
+  setInterval(() => setLiveStatus(), 1000);
 
   const TOP_MEDALS = ['🥇', '🥈', '🥉'];
   const VIP_NAMES = ['Regular Customer', 'VIP Customer', 'Super VIP', 'Diamond VIP'];
@@ -548,6 +610,30 @@
       } catch (_) {
         return;
       }
+      // JSON-RPC responses (success or error) for calls sent over the socket.
+      if (msg.id !== undefined && (msg.result !== undefined || msg.error)) {
+        const pending = pendingRpc.get(msg.id);
+        if (pending) {
+          pendingRpc.delete(msg.id);
+          pending.resolve(msg);
+          if (msg.error) {
+            setDockStatus(`Error: ${msg.error.message}`);
+            if (pending.method === 'live.connect') {
+              liveSnapshot = liveSnapshot || {};
+              liveSnapshot.tiktok = {
+                ...(liveSnapshot.tiktok || {}),
+                connected: false,
+                connecting: false,
+                reconnecting: false,
+                status: 'error',
+                lastError: msg.error.message
+              };
+              setLiveStatus();
+            }
+          }
+        }
+        return;
+      }
       if (msg.method === 'temple.state') {
         applyServerState(msg.params);
       } else if (msg.method === 'temple.event') {
@@ -573,17 +659,36 @@
       }
     };
 
-    ws.onclose = () => setTimeout(connectWebSocket, 2200);
+    ws.onclose = () => {
+      for (const pending of pendingRpc.values()) {
+        pending.resolve({ error: { message: 'WebSocket closed before the server replied.' } });
+      }
+      pendingRpc.clear();
+      setTimeout(connectWebSocket, 2200);
+    };
     ws.onerror = () => {};
   }
   connectWebSocket();
 
   async function callRpc(method, rpcParams = {}) {
     audio.ensureContext();
-    const payload = { jsonrpc: '2.0', id: rpcId++, method, params: rpcParams };
+    const id = rpcId++;
+    const payload = { jsonrpc: '2.0', id, method, params: rpcParams };
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(payload));
-      return null;
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          pendingRpc.delete(id);
+          resolve({ error: { message: 'No response from the server (timeout).' } });
+        }, 20000);
+        pendingRpc.set(id, {
+          method,
+          resolve: (data) => {
+            clearTimeout(timer);
+            resolve(data);
+          }
+        });
+        ws.send(JSON.stringify(payload));
+      });
     }
     try {
       const res = await fetch('/rpc', {
@@ -721,18 +826,29 @@
   }
 
   // ------------------------------------------------------------------ tiktok
-  $('btnConnectTikTok')?.addEventListener('click', () => {
+  $('btnConnectTikTok')?.addEventListener('click', async () => {
     const username = ($('inputTikTokUser') && $('inputTikTokUser').value.trim()) || '';
     if (!username) {
       setDockStatus('Enter a TikTok @username first.');
       return;
     }
+    const btn = $('btnConnectTikTok');
+    if (btn) btn.disabled = true;
     setDockStatus(`Connecting to ${username}…`);
-    callRpc('live.connect', { username });
+    const data = await callRpc('live.connect', { username });
+    if (btn) btn.disabled = false;
+    if (!data || data.error) {
+      setDockStatus(`Connection error: ${data && data.error ? data.error.message : 'no response from server'}`);
+      return;
+    }
+    setDockStatus(`TikTok LIVE connected to @${(data.result && data.result.username) || username.replace(/^@/, '')}.`);
   });
 
-  $('btnDisconnectTikTok')?.addEventListener('click', () => {
-    callRpc('live.disconnect');
+  $('btnDisconnectTikTok')?.addEventListener('click', async () => {
+    const btn = $('btnDisconnectTikTok');
+    if (btn) btn.disabled = true;
+    await callRpc('live.disconnect');
+    if (btn) btn.disabled = false;
     setDockStatus('TikTok disconnected.');
   });
 
