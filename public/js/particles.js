@@ -157,6 +157,31 @@
       }
     }
 
+    fireworks(bursts = 5) {
+      for (let i = 0; i < bursts; i++) {
+        const x = 240 + Math.random() * 600;
+        const y = 560 + Math.random() * 520;
+        const palette = ['#ffd76a', '#ffb347', '#7fe0ff', '#ffffff', '#ff8fb1'];
+        const color = palette[Math.floor(Math.random() * palette.length)];
+        for (let k = 0; k < 14; k++) {
+          const angle = (Math.PI * 2 * k) / 14;
+          const speed = 90 + Math.random() * 150;
+          this.add({
+            kind: 'star',
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: 10 + Math.random() * 12,
+            rot: Math.random() * Math.PI,
+            vrot: (Math.random() - 0.5) * 5,
+            life: 1,
+            color
+          });
+        }
+      }
+    }
+
     update(dt) {
       this.time += dt;
 
@@ -202,7 +227,15 @@
         if (p.kind === 'heart') {
           ctx.drawImage(this.heartSprite, -p.size / 2, -p.size / 2, p.size, p.size * 0.9);
         } else if (p.kind === 'star') {
-          ctx.drawImage(this.starSprite, -p.size / 2, -p.size / 2, p.size, p.size);
+          if (p.color) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size * 0.32, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.drawImage(this.starSprite, -p.size / 2, -p.size / 2, p.size, p.size);
+          }
         } else if (p.kind === 'bubble') {
           ctx.drawImage(this.bubbleSprite, -p.size / 2, -p.size / 2, p.size, p.size);
         } else {

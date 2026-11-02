@@ -433,6 +433,10 @@
         orderIds: new Set(),
         wave: 0,
         celebrate: 0,
+        excited: 0,
+        reaction: null,
+        sparkleTimer: 0,
+        vipLevel: Number(opts.vipLevel) || 0,
         leaving: false,
         leaveAfterServe: false,
         vip: Boolean(opts.vip),
@@ -528,6 +532,7 @@
         if (ev.user) existing.name = ev.user;
         if (ev.uniqueId) existing.uniqueId = ev.uniqueId;
         if (Number.isInteger(ev.sprite)) existing.spriteIndex = ev.sprite;
+        if (Number.isFinite(ev.vipLevel)) existing.vipLevel = Number(ev.vipLevel);
         return existing;
       }
       if (this.customers.length >= MAX_CUSTOMERS) return null;
@@ -539,6 +544,7 @@
         viewerId,
         spriteIndex: Number.isInteger(ev.sprite) ? ev.sprite : null,
         record,
+        vipLevel: Number(ev.vipLevel) || 0,
         priority: Boolean(ev.vip || ev.priority)
       });
       return character;
@@ -596,7 +602,8 @@
       }
       character.table = null;
       character.seat = null;
-      character.bubble = { text: 'Thanks! See you next live 👋', timer: 2600 };
+      character.bubble = { text: 'Thanks! See you next live! 👋', timer: 2600 };
+      character.wave = Math.max(character.wave || 0, 2.4);
       character.waypoints = [
         { x: character.x < W / 2 ? 430 : 700, y: 1730 },
         this.exitFor(character)
@@ -649,6 +656,54 @@
       }
     }
 
+    react(character, emoji, seconds = 1.4) {
+      if (!character) return;
+      character.reaction = { emoji, timer: seconds };
+    }
+
+    goldSparkles(character, count = 12) {
+      if (!character) return;
+      const scale = this.customerScale(character);
+      const diamond = (character.vipLevel || 0) >= 3;
+      for (let i = 0; i < count; i++) {
+        if (this.effects.length > 90) break;
+        this.effects.push({
+          kind: 'sparkle',
+          x: character.x + rand(-54, 54),
+          y: character.y - rand(110, 360) * scale,
+          vy: rand(30, 72),
+          drift: rand(-18, 18),
+          size: rand(6, 13),
+          color: diamond && i % 3 === 0 ? '#7fe0ff' : '#ffd76a',
+          t: 0,
+          life: rand(0.8, 1.5)
+        });
+      }
+    }
+
+    vipCelebrate(character) {
+      if (!character) return;
+      character.celebrate = Math.max(character.celebrate || 0, 2.6);
+      this.goldSparkles(character, (character.vipLevel || 0) >= 3 ? 24 : 14);
+      this.effects.push({
+        kind: 'burst',
+        x: character.x,
+        y: character.y - 300 * this.customerScale(character),
+        t: 0,
+        life: 1.7
+      });
+      this.react(character, '👑', 2);
+    }
+
+    /** Big donations make the whole shop cheer and wave. */
+    cheerAll(intensity = 1) {
+      for (const character of this.customers) {
+        character.wave = Math.max(character.wave || 0, 1.4 + intensity * 0.5);
+        character.celebrate = Math.max(character.celebrate || 0, 1.2 + intensity * 0.5);
+        if (character.viewerId) this.heartsAround(character, 2);
+      }
+    }
+
     handleViewerEvent(ev) {
       const character = this.ensureViewerCharacter(ev);
       if (!character) {
@@ -656,11 +711,19 @@
         return;
       }
       if (ev.vip) character.vip = true;
+      if (Number.isFinite(ev.vipLevel) && Number(ev.vipLevel) > (character.vipLevel || 0)) {
+        character.vipLevel = Number(ev.vipLevel);
+        this.vipCelebrate(character);
+      } else if (Number.isFinite(ev.vipLevel)) {
+        character.vipLevel = Number(ev.vipLevel);
+      }
+      if (ev.vipUpgraded) this.vipCelebrate(character);
 
       if (ev.type === 'viewerJoin' || ev.type === 'viewerReconnect') {
         character.leaving = false;
         character.leaveAfterServe = false;
         character.bubble = { text: ev.type === 'viewerReconnect' ? 'Back again!' : 'Hi everyone!', timer: 1800 };
+        this.react(character, '😊', 1.6);
         return;
       }
       if (ev.type === 'viewerLeave') {
@@ -674,15 +737,19 @@
         case 'freeDrink':
           character.vip = true;
           this.celebrate(character);
+          this.goldSparkles(character, 10);
           this.heartsAround(character, 6);
+          this.react(character, '🥳', 1.8);
           break;
         case 'likeBurst':
           character.wave = 2.4;
           this.heartsAround(character, Math.min(10, 3 + Math.round((Number(ev.count) || 1) / 2)));
+          this.react(character, '😄', 1.4);
           break;
         case 'commentOrder': {
-          const text = ev.bubbleText || ev.message || (ev.drink ? `One ${ev.drink.name}, please!` : 'Hello!');
+          const text = String(ev.bubbleText || ev.message || (ev.drink ? `One ${ev.drink.name}, please!` : 'Hello!')).slice(0, 110);
           character.bubble = { text, drink: ev.drink, timer: 3200 };
+          this.react(character, '💬', 1.4);
           this.enqueueViewerOrders(character, [{ id: ev.orderId, drink: ev.drink, coins: 0 }], {
             units: Number(ev.count) || 1
           });
@@ -705,6 +772,9 @@
             { units, front: true }
           );
           this.celebrate(character);
+          character.excited = 2;
+          this.react(character, '🤩', 1.8);
+          this.goldSparkles(character, 8);
           break;
         }
         case 'mysteryDrink':
@@ -741,6 +811,7 @@
         }
         if (!character) continue;
         character.vip = Boolean(character.vip || viewer.vip);
+        character.vipLevel = Math.max(character.vipLevel || 0, Number(viewer.vipLevel) || 0);
         for (const order of viewer.orders || []) {
           this.enqueueViewerOrders(
             character,
@@ -922,6 +993,12 @@
         });
       }
 
+      if (customer.viewerId) {
+        customer.bubble = { text: `Thank you, ${customer.name}! 😊`, timer: 2000 };
+        customer.wave = Math.max(customer.wave || 0, 1.2);
+        this.react(customer, '😊', 1.5);
+      }
+
       // Viewer left mid-service: finish this drink, then wave goodbye.
       if (customer.leaveAfterServe) {
         customer.cupInHand = false;
@@ -989,7 +1066,7 @@
       for (let i = this.effects.length - 1; i >= 0; i--) {
         const fx = this.effects[i];
         fx.t += dt;
-        if (fx.kind === 'heart') {
+        if (fx.kind === 'heart' || fx.kind === 'sparkle') {
           fx.y -= fx.vy * dt;
           fx.x += fx.drift * dt;
         }
@@ -1020,6 +1097,20 @@
         customer.walkPhase += dt * 8;
         if (customer.wave > 0) customer.wave = Math.max(0, customer.wave - dt);
         if (customer.celebrate > 0) customer.celebrate = Math.max(0, customer.celebrate - dt);
+        if (customer.excited > 0) customer.excited = Math.max(0, customer.excited - dt);
+        if (customer.reaction && customer.reaction.timer > 0) {
+          customer.reaction.timer = Math.max(0, customer.reaction.timer - dt);
+          if (customer.reaction.timer === 0) customer.reaction = null;
+        }
+        const vipLevelNow = customer.vipLevel || 0;
+        if (vipLevelNow > 0) {
+          customer.sparkleTimer = (customer.sparkleTimer || 0) + dt;
+          const sparkleGap = vipLevelNow >= 3 ? 0.34 : vipLevelNow === 2 ? 0.6 : 1.2;
+          if (customer.sparkleTimer >= sparkleGap && this.effects.length < 90) {
+            customer.sparkleTimer = 0;
+            this.goldSparkles(customer, 1);
+          }
+        }
 
         switch (customer.state) {
           case 'enter': {
@@ -1180,6 +1271,21 @@
           ctx.strokeStyle = COLORS.ink;
           ctx.lineWidth = 2.5;
           ctx.stroke();
+          ctx.restore();
+        } else if (fx.kind === 'sparkle') {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.translate(fx.x, fx.y);
+          ctx.rotate(fx.t * 3);
+          ctx.fillStyle = fx.color || '#ffd76a';
+          ctx.beginPath();
+          for (let i = 0; i < 4; i++) {
+            const angle = (Math.PI / 2) * i;
+            ctx.lineTo(Math.cos(angle) * fx.size, Math.sin(angle) * fx.size);
+            ctx.lineTo(Math.cos(angle + Math.PI / 4) * fx.size * 0.35, Math.sin(angle + Math.PI / 4) * fx.size * 0.35);
+          }
+          ctx.closePath();
+          ctx.fill();
           ctx.restore();
         } else if (fx.kind === 'burst') {
           ctx.save();
@@ -1433,7 +1539,8 @@
         customer.state === 'toGo';
       const walkBob = walking ? Math.abs(Math.sin(customer.walkPhase)) * 7 : 0;
       const idleBob = customer.state === 'queue' || customer.state === 'order' ? Math.sin(this.time * 2 + customer.id) * 2 : 0;
-      const feetY = customer.y - walkBob + idleBob;
+      const excitedHop = customer.excited > 0 ? Math.abs(Math.sin(this.time * 18)) * 10 : 0;
+      const feetY = customer.y - walkBob + idleBob - excitedHop;
       const seated = customer.state === 'seated';
 
       // shadow
@@ -1460,7 +1567,17 @@
         ctx.drawImage(s.canvas, cupX - cupW / 2, cupY - cupH / 2, cupW, cupH);
       }
 
-      if (customer.vip) this.drawCrown(ctx, customer.x, feetY - height - 10, scale);
+      const vipLevel = customer.vipLevel || 0;
+      if (vipLevel === 1) this.drawVipBadge(ctx, customer.x, feetY - height + 30 * scale, scale);
+      if (vipLevel >= 2) this.drawCrown(ctx, customer.x, feetY - height - 10, scale, vipLevel >= 3 ? 'diamond' : 'gold');
+      if (customer.reaction) {
+        ctx.save();
+        ctx.globalAlpha = clamp(customer.reaction.timer / 0.4, 0, 1);
+        ctx.font = `${Math.round(32 * clamp(scale, 0.8, 1.1))}px "Nunito", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(customer.reaction.emoji, customer.x - 38 * scale, feetY - height - 34 * scale);
+        ctx.restore();
+      }
       if (customer.wave > 0) {
         ctx.save();
         ctx.font = `${Math.round(34 * clamp(scale, 0.8, 1.1))}px "Nunito", sans-serif`;
@@ -1469,11 +1586,14 @@
         ctx.fillText('👋', customer.x + 34 * scale, feetY - height - 58 * scale);
         ctx.restore();
       }
-      if (customer.name) this.drawNameTag(ctx, customer, feetY - height - (customer.vip ? 34 : 12), scale);
+      if (customer.name) {
+        this.drawNameTag(ctx, customer, feetY - height - (vipLevel >= 2 ? 38 : customer.vip ? 34 : 12), scale);
+      }
       if (customer.bubble) this.drawBubble(ctx, customer.x, feetY - height - 6, customer.bubble, scale);
     }
 
-    drawCrown(ctx, x, y, scale) {
+    drawCrown(ctx, x, y, scale, style = 'gold') {
+      const diamond = style === 'diamond';
       const w = 34 * scale;
       const h = 22 * scale;
       ctx.save();
@@ -1486,11 +1606,35 @@
       ctx.lineTo(x + w / 2, y - h);
       ctx.lineTo(x + w / 2, y);
       ctx.closePath();
-      ctx.fillStyle = COLORS.sun;
+      ctx.fillStyle = diamond ? '#a9ecff' : COLORS.sun;
       ctx.fill();
-      ctx.strokeStyle = COLORS.ink;
+      ctx.strokeStyle = diamond ? '#2b6f9c' : COLORS.ink;
       ctx.lineWidth = 3;
       ctx.stroke();
+      if (diamond) {
+        ctx.beginPath();
+        ctx.arc(x, y - h * 0.55, 4.2 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    drawVipBadge(ctx, x, y, scale) {
+      const r = 15 * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + 28 * scale, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd76a';
+      ctx.fill();
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.font = `800 ${Math.round(11 * clamp(scale, 0.85, 1.1))}px "Nunito", sans-serif`;
+      ctx.fillStyle = '#6b4512';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('VIP', x + 28 * scale, y + 0.5);
       ctx.restore();
     }
 
@@ -1510,9 +1654,23 @@
       const tagW = Math.max(64, ctx.measureText(text).width + 26);
       const tagX = clamp(customer.x - tagW / 2, 10, W - tagW - 10);
       roundedRect(ctx, tagX, y - tagH, tagW, tagH, 12);
-      ctx.fillStyle = customer.vip ? 'rgba(255, 223, 130, 0.97)' : 'rgba(255, 251, 240, 0.95)';
+      const level = customer.vipLevel || 0;
+      if (level >= 3) {
+        ctx.shadowColor = '#69d2ff';
+        ctx.shadowBlur = 18;
+      } else if (level === 2) {
+        ctx.shadowColor = '#ffcf4d';
+        ctx.shadowBlur = 12;
+      }
+      ctx.fillStyle =
+        level >= 2
+          ? 'rgba(255, 226, 138, 0.98)'
+          : customer.vip
+            ? 'rgba(255, 223, 130, 0.97)'
+            : 'rgba(255, 251, 240, 0.95)';
       ctx.fill();
-      ctx.strokeStyle = COLORS.ink;
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = level >= 3 ? '#2b6f9c' : COLORS.ink;
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.fillStyle = COLORS.ink;
@@ -1526,7 +1684,7 @@
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.font = '800 21px "Nunito", sans-serif';
-      const text = ellipsize(ctx, bubble.text, 330);
+      const text = ellipsize(ctx, String(bubble.text || '').slice(0, 120), 330);
       const textW = ctx.measureText(text).width;
       const hasDrink = Boolean(bubble.drink && bubble.drink.sprite);
       const iconW = hasDrink ? 42 : 0;

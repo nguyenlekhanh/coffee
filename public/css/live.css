@@ -560,6 +560,116 @@ body.obs-mode .stage-wrapper {
   flex: 0 0 auto;
   color: var(--mint);
 }
+/* --- top-3 supporter leaderboard --------------------------------------- */
+.leader-item.leader-top {
+  align-items: center;
+  gap: 6px;
+  padding: 3px 2px;
+  border-radius: 10px;
+}
+.leader-medal {
+  flex: 0 0 auto;
+  font-size: 19px;
+  line-height: 1;
+}
+.leader-avatar {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  object-fit: cover;
+  background: var(--sun);
+}
+.leader-avatar.fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #6b4512;
+}
+.leader-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.leader-main .leader-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leader-vip {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.leader-vip.vip-1 { color: #a07a12; }
+.leader-vip.vip-2 { color: #b47b00; }
+.leader-vip.vip-3 { color: #0e6b93; }
+.leader-coins {
+  flex: 0 0 auto;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--mint);
+}
+.lb-new {
+  animation: lbPop 0.9s ease-out;
+}
+@keyframes lbPop {
+  0% { transform: translateX(28px) scale(0.9); background: rgba(255, 214, 106, 0.9); }
+  60% { transform: translateX(0) scale(1.02); background: rgba(255, 226, 138, 0.7); }
+  100% { transform: none; background: transparent; }
+}
+
+/* --- supporter notifications ------------------------------------------- */
+.notice-stack {
+  position: absolute;
+  top: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 76%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 32;
+  pointer-events: none;
+}
+.notice {
+  background: rgba(255, 247, 228, 0.97);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  padding: 9px 14px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 5px 0 rgba(59, 42, 32, 0.28);
+  animation: noticeIn 0.35s ease-out;
+}
+.notice.vip {
+  background: linear-gradient(180deg, #ffe9a3 0%, #ffd15c 100%);
+}
+.notice.grand {
+  background: linear-gradient(180deg, #fff3c4 0%, #ffcf4d 100%);
+  border-color: #8a5a1b;
+  font-size: 19px;
+}
+.notice.join {
+  background: rgba(255, 251, 240, 0.95);
+  font-size: 15.5px;
+}
+@keyframes noticeIn {
+  from { opacity: 0; transform: translateY(-14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
 .lb-empty {
   font-size: 14px;
   font-weight: 700;

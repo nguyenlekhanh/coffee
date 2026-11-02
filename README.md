@@ -194,6 +194,53 @@ One TikTok viewer = one persistent game character for the whole live session.
   `live.*`). `GET /api/state` exposes `viewers`, `viewerSummary`, `session`,
   `leaderboard` and `lifetimeLeaderboard`.
 
+## 👑 VIP Progression, Emotions & Celebrations
+
+Viewer VIP level comes from coins donated during the current live session
+(25 = VIP, 50 = Super VIP, 100 = Diamond VIP, 0–24 = Regular Customer). Levels
+recompute on every valid gift, so multiple gifts accumulate, the character is
+never replaced, and session levels reset when a new live session starts.
+
+- **Appearance**: VIP 1 gets a gold VIP badge and soft sparkles, VIP 2 a gold
+  crown with a glowing gold nameplate, VIP 3 a diamond crown with blue/gold
+  sparkles and a blue-glow nameplate.
+- **Emotions**: happy entry, waving + hearts on likes, gold sparkles on follows,
+  truncated speech bubbles on comments, an excited hop with gift animation,
+  a thank-you smile when the drink is served, and a goodbye wave on leave.
+- **Celebrations** by individual gift value: 25–49 confetti, 50–99 golden
+  confetti and gold particles, 100–499 fireworks with a VIP announcement, 500+
+  a grand celebration where every customer cheers. Combo replays are deduped by
+  order id on both the server and the stage.
+- **Notifications**: animated banners for thank-yous, VIP promotions, new top
+  supporter and big gifts (see `#noticeStack`).
+- **Audio**: `playCoin`, `playVipUpgrade`, `playCelebration`, `playFireworks` sit
+  on their own `sfxVolume` gain, separate from music and Piper voice, throttled
+  so bursts of events never stack cues.
+- **Admin**: the “VIP & Supporters” card shows session donations, VIP counts and
+  the top 3, with test buttons (`shop.testVip`, `shop.testCelebration`) that
+  replay the real visuals without touching leaderboard or session coins.
+
+## 📣 Automatic Shop Announcer
+
+A context-aware announcer keeps the stream talking even when nobody interacts.
+
+- **Scheduler**: starts with the shop, speaks every 5–8 s by default (5/8/10/15/20 s
+  selectable), never interrupts a sentence, waits for the Piper queue to empty, never
+  repeats the previous line, and stops while the shop is paused.
+- **Context**: empty shop → welcome + invite; waiting customers → drink promos; a drink
+  being served → atmosphere; quiet chat → call-to-action; new viewer → an occasional
+  username greeting. Generic lines stay quiet for a few seconds after a personalized
+  TikTok event so thank-yous never duplicate.
+- **Catalog**: 26 editable English + Vietnamese sentences in five categories
+  (welcome, drinks, call to action, atmosphere, supporter appreciation), stored in
+  `localStorage` and managed from the admin panel (add/edit/delete/enable, filter,
+  search, test individual lines).
+- **Voices**: local Piper models only (`config/piper/en`, `config/piper/vn`), with
+  female/male/random seller selection, language, speed and volume controls.
+- **Shared speech queue**: priority 0 gifts/VIP, 1 viewer replies, 2 announcements.
+  Announcements are skipped rather than queued behind speech; important lines clear
+  queued chatter; music and SFX keep their own volumes.
+
 ## 🎵 Background Music Playlist
 
 `public/js/music.js` (`ShopMusicPlayer`) owns the background playlist; `public/js/audio.js` delegates all music playback to it and keeps the synthesized ambience only as a fallback. Music volume is independent from the Piper voice volume and is remembered in `localStorage` (`shop_music_vol`) together with the last track (`shop_music_track`).

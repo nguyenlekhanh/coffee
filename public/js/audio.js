@@ -19,8 +19,12 @@
 
       const savedMusic = parseFloat(localStorage.getItem('shop_music_vol'));
       const savedTts = parseFloat(localStorage.getItem('shop_tts_vol'));
+      const savedSfx = parseFloat(localStorage.getItem('shop_sfx_vol'));
       this.bgBaseVolume = Number.isFinite(savedMusic) ? Math.max(0, Math.min(1, savedMusic)) : 0.55;
       this.ttsVolume = Number.isFinite(savedTts) ? Math.max(0, Math.min(1, savedTts)) : 0.9;
+      // SFX sit on their own gain value so music/TTS levels never move them.
+      this.sfxVolume = Number.isFinite(savedSfx) ? Math.max(0, Math.min(1, savedSfx)) : 0.85;
+      this.lastSfx = new Map();
 
       this.synthBgTimer = null;
       this.ttsQueue = [];
@@ -68,6 +72,15 @@
         localStorage.setItem('shop_music_vol', String(v));
       } catch (_) {}
       if (this.music) this.music.setVolume(v);
+    }
+
+    setSfxVolume(vol) {
+      const v = Math.max(0, Math.min(1, Number(vol)));
+      if (!Number.isFinite(v)) return;
+      this.sfxVolume = v;
+      try {
+        localStorage.setItem('shop_sfx_vol', String(v));
+      } catch (_) {}
     }
 
     setTtsVolume(vol) {
@@ -164,6 +177,15 @@
       else this.startAmbience();
     }
 
+    /** Snapshot for the announcer + admin panel. */
+    getSpeechStatus() {
+      return {
+        playing: this.ttsPlaying,
+        current: this.currentAudio ? this.currentAudio.src : '',
+        queued: this.ttsQueue.map((item) => ({ text: item.text, priority: item.priority || 1 }))
+      };
+    }
+
     getMusicState() {
       return this.music ? this.music.snapshot() : null;
     }
@@ -171,6 +193,8 @@
     // --------------------------------------------------------------- one shots
     tone(freq, duration, type = 'sine', volume = 0.18, startOffset = 0, slideTo = 0) {
       if (!this.sfxEnabled) return;
+      const scaled = Math.max(0, Math.min(1, volume * this.sfxVolume));
+      if (scaled <= 0.001) return;
       try {
         const ctx = this.ensureContext();
         if (!ctx) return;
@@ -181,7 +205,7 @@
         osc.frequency.setValueAtTime(freq, now);
         if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration * 0.9);
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.linearRampToValueAtTime(volume, now + 0.012);
+        gain.gain.linearRampToValueAtTime(scaled, now + 0.012);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
         osc.connect(gain);
         gain.connect(ctx.destination);
@@ -219,6 +243,42 @@
       });
     }
 
+    // Throttle so a burst of TikTok events never stacks the same cue.
+    sfxAllowed(key, gapMs) {
+      const now = Date.now();
+      const last = this.lastSfx.get(key) || 0;
+      if (now - last < gapMs) return false;
+      this.lastSfx.set(key, now);
+      return true;
+    }
+
+    playCoin() {
+      if (!this.sfxAllowed('coin', 260)) return;
+      [1046.5, 1318.5, 1568].forEach((freq, i) => this.tone(freq, 0.14, 'triangle', 0.08, i * 0.07));
+    }
+
+    playVipUpgrade() {
+      if (!this.sfxAllowed('vip', 900)) return;
+      [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((freq, i) =>
+        this.tone(freq, 0.3, 'triangle', 0.11, i * 0.1)
+      );
+      this.tone(2093, 0.45, 'sine', 0.05, 0.5);
+    }
+
+    playCelebration() {
+      if (!this.sfxAllowed('celebrate', 700)) return;
+      [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => this.tone(freq, 0.24, 'square', 0.09, i * 0.08));
+      this.tone(1568, 0.5, 'triangle', 0.06, 0.36);
+    }
+
+    playFireworks() {
+      if (!this.sfxAllowed('fireworks', 1200)) return;
+      this.tone(220, 0.5, 'sawtooth', 0.05, 0, 80);
+      [659.25, 880, 1046.5, 1318.5, 1568].forEach((freq, i) =>
+        this.tone(freq, 0.3, 'triangle', 0.09, 0.18 + i * 0.12)
+      );
+    }
+
     // --------------------------------------------------------------- voice queue
     enqueueTts(text, options = {}) {
       const onStart = typeof options.onStart === 'function' ? options.onStart : null;
@@ -236,7 +296,18 @@
         return;
       }
 
-      if (this.ttsQueue.length >= 5) {
+      // Priority 0 = gifts/VIP, 1 = viewer replies, 2 = automatic announcements.
+      const priority = Number.isFinite(Number(options.priority)) ? Number(options.priority) : 1;
+
+      // Automatic chatter never queues behind speech and never floods the queue.
+      if (priority >= 2) {
+        if (this.ttsPlaying || this.ttsQueue.length > 0) return false;
+      }
+      // An important line clears queued automatic chatter — never playing audio.
+      if (priority <= 1 && this.ttsQueue.length >= 2) {
+        this.ttsQueue = this.ttsQueue.filter((queued) => (queued.priority || 1) < 2);
+      }
+      if (this.ttsQueue.length >= 6) {
         const dropped = this.ttsQueue.shift();
         if (dropped && dropped.onStart) dropped.onStart();
         if (dropped && dropped.onEnd) dropped.onEnd();
@@ -244,6 +315,7 @@
 
       const item = {
         id: `tts_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        priority,
         text: clean,
         language: options.language || this.ttsLanguage || 'en',
         voice: options.voice || this.ttsVoice || 'en_US-amy-medium',
@@ -261,8 +333,12 @@
         });
       }
 
-      this.ttsQueue.push(item);
+      // Higher priority items move to the front of the waiting line.
+      let insertAt = this.ttsQueue.findIndex((queued) => (queued.priority || 1) > priority);
+      if (insertAt === -1) insertAt = this.ttsQueue.length;
+      this.ttsQueue.splice(insertAt, 0, item);
       this.processTtsQueue();
+      return true;
     }
 
     async fetchPiperAudio(text, options = {}) {

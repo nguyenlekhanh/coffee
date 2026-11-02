@@ -102,6 +102,20 @@
     }
     .music-title { flex: 1; }
     .music-state { font-size: 11.5px; color: var(--coral-dark); }
+    .ann-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+    .ann-row {
+      display: flex; align-items: flex-start; gap: 8px; background: #fff;
+      border: 2px solid rgba(59, 42, 32, 0.3); border-radius: 10px; padding: 8px 10px;
+    }
+    .ann-row.disabled { opacity: 0.55; }
+    .ann-row .btn { flex: 0 0 auto; padding: 6px 9px; font-size: 12px; }
+    .ann-text { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; line-height: 1.35; }
+    .ann-cat {
+      display: inline-block; font-size: 10px; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--coral-dark); font-weight: 800; margin-bottom: 2px;
+    }
+    .ann-vi { color: var(--ink-soft); font-weight: 600; font-size: 12px; }
+    .ann-toggle { padding-top: 2px; }
   </style>
 </head>
 <body>
@@ -274,7 +288,110 @@
       </section>
 
       <section class="card" style="grid-column: 1 / -1">
-        <h2>🏆 6. Top Supporters</h2>
+        <h2>📣 AI SHOP ANNOUNCER</h2>
+        <div class="row">
+          <button class="btn on" id="btnAnnEnable">Enabled</button>
+          <button class="btn" id="btnAnnRun">▶ Start</button>
+          <button class="btn gold" id="btnAnnTest">🔊 Test voice</button>
+          <div>
+            <div class="label-line"><span>Interval</span></div>
+            <select id="annInterval">
+              <option value="5">5 seconds</option>
+              <option value="8">8 seconds</option>
+              <option value="10">10 seconds</option>
+              <option value="15">15 seconds</option>
+              <option value="20">20 seconds</option>
+            </select>
+          </div>
+          <div>
+            <div class="label-line"><span>Language</span></div>
+            <select id="annLanguage">
+              <option value="en">English</option>
+              <option value="vi">Vietnamese</option>
+            </select>
+          </div>
+          <div>
+            <div class="label-line"><span>Seller voice</span></div>
+            <select id="annVoiceMode">
+              <option value="female">Female seller</option>
+              <option value="male">Male seller</option>
+              <option value="random">Random seller</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <div class="label-line"><span>Speech speed</span><strong id="valAnnSpeed">1.00×</strong></div>
+            <input type="range" id="annSpeed" min="50" max="200" step="5" value="100" />
+          </div>
+          <div>
+            <div class="label-line"><span>Speech volume</span><strong id="valAnnVol">90%</strong></div>
+            <input type="range" id="annVol" min="0" max="100" step="5" value="90" />
+          </div>
+          <div>
+            <div class="label-line"><span>Order</span></div>
+            <button class="btn on" id="btnAnnShuffle">Shuffle: ON</button>
+          </div>
+        </div>
+        <div class="hint" id="annStatus">Waiting for the live stage…</div>
+
+        <div class="label-line"><span>Announcement manager</span><strong id="annCount">0</strong></div>
+        <div class="row">
+          <select id="annFilter"><option value="">All categories</option></select>
+          <input type="text" id="annSearch" placeholder="Search English or Vietnamese text" />
+        </div>
+        <div class="ann-list" id="annList"></div>
+        <div class="row">
+          <select id="annNewCategory"></select>
+          <select id="annNewLanguage">
+            <option value="both">English + Vietnamese</option>
+            <option value="en">English only</option>
+            <option value="vi">Vietnamese only</option>
+          </select>
+        </div>
+        <div class="row">
+          <input type="text" id="annNewEn" placeholder="New English sentence" />
+          <input type="text" id="annNewVi" placeholder="Vietnamese version" />
+          <button class="btn gold" id="btnAnnAdd">＋ Add sentence</button>
+          <button class="btn" id="btnAnnReset">Restore defaults</button>
+        </div>
+        <div class="hint">
+          Automatic announcements use the local Piper models only, never cloud TTS. They wait for the current
+          sentence to finish, never repeat the previous line, and pause with the shop.
+        </div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>👑 6. VIP &amp; Supporters</h2>
+        <div class="row">
+          <div>
+            <div class="label-line"><span>Session donations</span><strong id="vipDonations">0</strong></div>
+          </div>
+          <div>
+            <div class="label-line"><span>VIP customers</span><strong id="vipCount">0</strong></div>
+          </div>
+          <div>
+            <div class="label-line"><span>Super VIP</span><strong id="superVipCount">0</strong></div>
+          </div>
+          <div>
+            <div class="label-line"><span>Diamond VIP</span><strong id="diamondCount">0</strong></div>
+          </div>
+        </div>
+        <div id="vipTopList" class="hint">No supporters yet.</div>
+        <div class="row">
+          <button class="btn" data-vip-test="25">Test VIP 25 coins</button>
+          <button class="btn" data-vip-test="50">Test Super VIP 50</button>
+          <button class="btn gold" data-vip-test="100">Test Diamond VIP 100</button>
+          <button class="btn danger" data-vip-test="500">Test Grand Celebration 500</button>
+        </div>
+        <div class="hint">
+          Test buttons replay the real celebration and VIP handlers on the live screen. They never add
+          leaderboard entries, session coins or supporter history.
+        </div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>🏆 7. Top Supporters</h2>
         <table>
           <thead><tr><th>#</th><th>Viewer</th><th>Coins</th><th>Tips</th><th>Drinks</th><th>Gifts</th></tr></thead>
           <tbody id="supportersBody">
@@ -285,6 +402,7 @@
     </div>
   </div>
 
+  <script src="/js/announcer.js"></script>
   <script src="/js/music.js"></script>
   <script>
     async function sendRpc(method, extraParams = {}) {
@@ -311,6 +429,13 @@
         if (act === 'gift') sendRpc('shop.gift', { coins: 48, giftName: 'Coffee Run' });
         if (act === 'mystery') sendRpc('shop.mysteryDrink', {});
         if (act === 'free') sendRpc('shop.freeDrink', {});
+      });
+    });
+
+    document.querySelectorAll('[data-vip-test]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const coins = Number(btn.getAttribute('data-vip-test'));
+        sendRpc(coins >= 500 ? 'shop.testCelebration' : 'shop.testVip', { coins });
       });
     });
 
@@ -487,6 +612,22 @@
             : `Piper ${st.tts.status}${st.tts.error ? ' · ' + st.tts.error : ''}`;
         }
 
+        const vip = st.vipSummary || {};
+        document.getElementById('vipDonations').textContent = Number(vip.sessionDonations || 0).toLocaleString('en-US');
+        document.getElementById('vipCount').textContent = String(vip.vip || 0);
+        document.getElementById('superVipCount').textContent = String(vip.superVip || 0);
+        document.getElementById('diamondCount').textContent = String(vip.diamond || 0);
+        const vipTop = Array.isArray(st.leaderboard) ? st.leaderboard.slice(0, 3) : [];
+        document.getElementById('vipTopList').innerHTML = vipTop.length
+          ? vipTop
+              .map(
+                (s) =>
+                  `<div>${['🥇', '🥈', '🥉'][s.rank - 1] || s.rank} <strong>@${escapeHtml(s.name)}</strong> · ` +
+                  `${Number(s.coins || 0).toLocaleString('en-US')} coins · ${escapeHtml(s.vipName || 'Regular Customer')}</div>`
+              )
+              .join('')
+          : 'No supporters yet.';
+
         const donationState = st.donation || {};
         document.getElementById('donCoins').textContent = Number(donationState.totalCoins || 0).toLocaleString('en-US');
         document.getElementById('donDrinks').textContent = Number(donationState.drinksServed || 0).toLocaleString('en-US');
@@ -525,6 +666,252 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    // ------------------------------------------------------- shop announcer
+    const announcerChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('sunny-side-announcer') : null;
+    const annStore = window.ShopAnnouncerStore;
+    let annSettings = annStore.loadSettings();
+    let annStatus = null;
+
+    const annCategories = window.SHOP_ANNOUNCER_CATEGORIES || [];
+
+    function categoryLabel(id) {
+      const found = annCategories.find((c) => c.id === id);
+      return found ? found.label : id;
+    }
+
+    function annTestVoice() {
+      const list = annStore.loadList().filter((a) => a.enabled !== false);
+      const item = list[0];
+      const text = item ? (annSettings.language === 'vi' ? item.textVi || item.textEn : item.textEn || item.textVi) : 'Welcome to Sunny Side Sips!';
+      const voice = annVoicePreview();
+      sendRpc('shop.speak', {
+        text,
+        language: annSettings.language,
+        speed: annSettings.speed,
+        voice: voice || undefined,
+        broadcast: true
+      });
+    }
+
+    function annVoicePreview() {
+      const lang = annSettings.language === 'vi' ? 'vi' : 'en';
+      const map = {
+        en: { female: 'en_US-hfc_female-medium', male: 'en_US-arctic-medium' },
+        vi: { female: 'banmai', male: 'manhdung' }
+      };
+      if (annSettings.voiceMode === 'random') return '';
+      return (map[lang] && map[lang][annSettings.voiceMode]) || '';
+    }
+
+    function saveAnnSettings(patch) {
+      annSettings = annStore.saveSettings(patch);
+      if (announcerChannel) {
+        announcerChannel.postMessage({ type: 'refresh' });
+        announcerChannel.postMessage({ type: 'status-request' });
+      }
+      renderAnnControls();
+    }
+
+    function renderAnnControls() {
+      const intervalSelect = document.getElementById('annInterval');
+      const allowed = Array.from(intervalSelect.options).map((o) => Number(o.value));
+      if (!allowed.includes(Number(annSettings.interval))) {
+        annSettings = annStore.saveSettings({ interval: 8 });
+      }
+      intervalSelect.value = String(annSettings.interval);
+      document.getElementById('annLanguage').value = annSettings.language;
+      document.getElementById('annVoiceMode').value = annSettings.voiceMode;
+      document.getElementById('annSpeed').value = String(Math.round((annSettings.speed || 1) * 100));
+      document.getElementById('valAnnSpeed').textContent = Number(annSettings.speed || 1).toFixed(2) + '×';
+      document.getElementById('annVol').value = String(Math.round((annSettings.volume ?? 0.9) * 100));
+      document.getElementById('valAnnVol').textContent = Math.round((annSettings.volume ?? 0.9) * 100) + '%';
+
+      const enableBtn = document.getElementById('btnAnnEnable');
+      enableBtn.textContent = annSettings.enabled ? 'Enabled' : 'Disabled';
+      enableBtn.classList.toggle('on', Boolean(annSettings.enabled));
+      const runBtn = document.getElementById('btnAnnRun');
+      runBtn.textContent = annSettings.running ? '⏸ Stop' : '▶ Start';
+      runBtn.classList.toggle('on', Boolean(annSettings.running));
+      const shuffleBtn = document.getElementById('btnAnnShuffle');
+      shuffleBtn.textContent = 'Shuffle: ' + (annSettings.shuffle ? 'ON' : 'OFF');
+      shuffleBtn.classList.toggle('on', Boolean(annSettings.shuffle));
+
+      const status = document.getElementById('annStatus');
+      if (!annStatus) {
+        status.textContent = 'Waiting for the live stage…';
+      } else if (!annStatus.enabled) {
+        status.textContent = 'Announcer disabled.';
+      } else if (annStatus.paused) {
+        status.textContent = 'Paused with the shop.';
+      } else if (annStatus.speaking) {
+        status.textContent = `Speaking now: “${annStatus.currentText}”`;
+      } else {
+        const wait = Math.max(0, Math.ceil((annStatus.nextDueAt - Date.now()) / 1000));
+        status.textContent =
+          `Idle · next start in ~${wait}s` + (annStatus.next ? ` · next: “${annStatus.next.text}”` : '');
+      }
+    }
+
+    function renderAnnList() {
+      const list = annStore.loadList();
+      const filter = document.getElementById('annFilter').value;
+      const search = document.getElementById('annSearch').value.trim().toLowerCase();
+      const rows = list.filter(
+        (a) =>
+          (!filter || a.category === filter) &&
+          (!search || `${a.textEn || ''} ${a.textVi || ''}`.toLowerCase().includes(search))
+      );
+      document.getElementById('annCount').textContent =
+        `${list.filter((a) => a.enabled !== false).length}/${list.length} enabled`;
+      const container = document.getElementById('annList');
+      container.innerHTML = rows.length
+        ? rows
+            .map(
+              (a) => `
+          <div class="ann-row${a.enabled === false ? ' disabled' : ''}">
+            <label class="ann-toggle"><input type="checkbox" data-ann-toggle="${a.id}" ${a.enabled !== false ? 'checked' : ''} /></label>
+            <div class="ann-text">
+              <span class="ann-cat">${escapeHtml(categoryLabel(a.category))}</span>
+              <div>${escapeHtml(a.textEn || '')}</div>
+              <div class="ann-vi">${escapeHtml(a.textVi || '')}</div>
+            </div>
+            <button class="btn" data-ann-test="${a.id}" title="Speak this sentence">🔊</button>
+            <button class="btn" data-ann-edit="${a.id}" title="Edit">✏️</button>
+            <button class="btn danger" data-ann-del="${a.id}" title="Delete">🗑</button>
+          </div>`
+            )
+            .join('')
+        : '<div class="hint">No announcements match this filter.</div>';
+
+      container.querySelectorAll('[data-ann-toggle]').forEach((box) => {
+        box.onchange = () => {
+          annStore.updateItem(box.getAttribute('data-ann-toggle'), { enabled: box.checked });
+          renderAnnList();
+          if (announcerChannel) announcerChannel.postMessage({ type: 'refresh' });
+        };
+      });
+      container.querySelectorAll('[data-ann-test]').forEach((btn) => {
+        btn.onclick = () => {
+          const item = annStore.loadList().find((a) => a.id === btn.getAttribute('data-ann-test'));
+          if (!item) return;
+          const text = annSettings.language === 'vi' ? item.textVi || item.textEn : item.textEn || item.textVi;
+          sendRpc('shop.speak', {
+            text,
+            language: annSettings.language,
+            speed: annSettings.speed,
+            voice: annVoicePreview() || undefined,
+            broadcast: true
+          });
+        };
+      });
+      container.querySelectorAll('[data-ann-edit]').forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute('data-ann-edit');
+          const item = annStore.loadList().find((a) => a.id === id);
+          if (!item) return;
+          const textEn = prompt('English sentence:', item.textEn || '');
+          if (textEn === null) return;
+          const textVi = prompt('Vietnamese sentence:', item.textVi || '');
+          if (textVi === null) return;
+          annStore.updateItem(id, { textEn: textEn.trim(), textVi: textVi.trim() });
+          renderAnnList();
+          if (announcerChannel) announcerChannel.postMessage({ type: 'refresh' });
+        };
+      });
+      container.querySelectorAll('[data-ann-del]').forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute('data-ann-del');
+          if (!confirm('Delete this announcement?')) return;
+          annStore.removeItem(id);
+          renderAnnList();
+          if (announcerChannel) announcerChannel.postMessage({ type: 'refresh' });
+        };
+      });
+    }
+
+    function fillAnnCategoryOptions() {
+      const filter = document.getElementById('annFilter');
+      const adder = document.getElementById('annNewCategory');
+      filter.innerHTML =
+        '<option value="">All categories</option>' +
+        annCategories.map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join('');
+      adder.innerHTML = annCategories
+        .map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`)
+        .join('');
+    }
+
+    fillAnnCategoryOptions();
+    renderAnnControls();
+    renderAnnList();
+
+    document.getElementById('btnAnnEnable').onclick = () =>
+      saveAnnSettings({ enabled: !annSettings.enabled });
+    document.getElementById('btnAnnRun').onclick = () => saveAnnSettings({ running: !annSettings.running });
+    document.getElementById('btnAnnTest').onclick = annTestVoice;
+    document.getElementById('btnAnnShuffle').onclick = () =>
+      saveAnnSettings({ shuffle: !annSettings.shuffle });
+    document.getElementById('annInterval').onchange = (e) =>
+      saveAnnSettings({ interval: Number(e.target.value) });
+    document.getElementById('annLanguage').onchange = (e) =>
+      saveAnnSettings({ language: e.target.value });
+    document.getElementById('annVoiceMode').onchange = (e) =>
+      saveAnnSettings({ voiceMode: e.target.value });
+    document.getElementById('annSpeed').oninput = (e) => {
+      document.getElementById('valAnnSpeed').textContent =
+        (Number(e.target.value) / 100).toFixed(2) + '×';
+    };
+    document.getElementById('annSpeed').onchange = (e) =>
+      saveAnnSettings({ speed: Number(e.target.value) / 100 });
+    document.getElementById('annVol').oninput = (e) => {
+      document.getElementById('valAnnVol').textContent = e.target.value + '%';
+    };
+    document.getElementById('annVol').onchange = (e) => {
+      const volume = Number(e.target.value) / 100;
+      saveAnnSettings({ volume });
+      sendRpc('temple.updateSettings', { ttsVolume: volume });
+    };
+    document.getElementById('annFilter').onchange = renderAnnList;
+    document.getElementById('annSearch').oninput = renderAnnList;
+    document.getElementById('btnAnnAdd').onclick = () => {
+      const textEn = document.getElementById('annNewEn').value.trim();
+      const textVi = document.getElementById('annNewVi').value.trim();
+      if (!textEn && !textVi) {
+        alert('Please type an English or Vietnamese sentence first.');
+        return;
+      }
+      annStore.addItem({
+        category: document.getElementById('annNewCategory').value,
+        language: document.getElementById('annNewLanguage').value,
+        textEn,
+        textVi
+      });
+      document.getElementById('annNewEn').value = '';
+      document.getElementById('annNewVi').value = '';
+      renderAnnList();
+      if (announcerChannel) announcerChannel.postMessage({ type: 'refresh' });
+    };
+    document.getElementById('btnAnnReset').onclick = () => {
+      if (!confirm('Restore the default announcement sentences?')) return;
+      annStore.resetList();
+      renderAnnList();
+      if (announcerChannel) announcerChannel.postMessage({ type: 'refresh' });
+    };
+
+    if (announcerChannel) {
+      announcerChannel.onmessage = (event) => {
+        const data = event.data || {};
+        if (data.type === 'status' && data.status) {
+          annStatus = data.status;
+          renderAnnControls();
+        }
+      };
+      announcerChannel.postMessage({ type: 'status-request' });
+      setInterval(() => {
+        announcerChannel.postMessage({ type: 'status-request' });
+        renderAnnControls();
+      }, 2000);
     }
 
     refreshStatus();

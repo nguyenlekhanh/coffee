@@ -40,6 +40,22 @@
   // Start the background playlist right away; if the browser blocks autoplay the
   // player retries on the first pointer/key gesture.
   audio.startMusic();
+
+  // Automatic shop announcer: speaks through the same Piper queue.
+  const announcer = window.ShopAnnouncer
+    ? new window.ShopAnnouncer({
+        audio,
+        getContext: () => ({
+          stats: {
+            customers: game.customers ? game.customers.length : 0,
+            waiting: game.queue ? game.queue.length : 0,
+            serving: Boolean(game.servingId)
+          },
+          viewers: game.viewers ? game.viewers.size : 0
+        })
+      })
+    : null;
+  window.shopAnnouncer = announcer;
   window.addEventListener('error', (e) => console.error('[ShopError]', e.message));
 
   let rpcId = 1;
@@ -104,24 +120,139 @@
     }
   }
 
+  const TOP_MEDALS = ['🥇', '🥈', '🥉'];
+  const VIP_NAMES = ['Regular Customer', 'VIP Customer', 'Super VIP', 'Diamond VIP'];
+  let lastLeaderboardKey = '';
+  let lastTopName = '';
+
+  function vipNameFor(level) {
+    return VIP_NAMES[Math.max(0, Math.min(3, Number(level) || 0))];
+  }
+
+  function initialFor(name) {
+    const clean = String(name || '?').replace(/^@/, '').trim();
+    return clean ? clean.charAt(0).toUpperCase() : '?';
+  }
+
   function renderLeaderboard(list) {
     const el = $('leaderboardList');
     if (!el) return;
     if (!Array.isArray(list) || list.length === 0) {
       el.innerHTML = '<div class="lb-empty">No supporters yet.<br />Likes, follows and gifts show up here.</div>';
+      lastLeaderboardKey = '';
+      lastTopName = '';
       return;
     }
-    el.innerHTML = list
-      .slice(0, 4)
-      .map(
-        (item) => `
-        <div class="leader-item">
-          <span class="leader-rank">${item.rank}</span>
-          <span class="leader-name">${escapeHtml(shortName(item.name, 15))}</span>
-          <span class="leader-tip">💰 ${Number(item.coins || 0).toLocaleString('en-US')}</span>
-        </div>`
-      )
+    const top = list.slice(0, 3);
+    const key = top.map((item) => `${item.uniqueId || item.name}:${item.coins}`).join('|');
+    const changed = key !== lastLeaderboardKey && lastLeaderboardKey !== '';
+    lastLeaderboardKey = key;
+
+    el.innerHTML = top
+      .map((item, index) => {
+        const level = Number(item.vipLevel) || 0;
+        const isNew = changed && index === 0;
+        const avatar = item.avatar
+          ? `<img class="leader-avatar" src="${escapeHtml(item.avatar)}" alt="" />`
+          : `<span class="leader-avatar fallback">${escapeHtml(initialFor(item.name))}</span>`;
+        return `
+        <div class="leader-item leader-top${isNew ? ' lb-new' : ''}">
+          <span class="leader-medal">${TOP_MEDALS[index]}</span>
+          ${avatar}
+          <span class="leader-main">
+            <span class="leader-name">${escapeHtml(shortName(item.name, 14))}</span>
+            <span class="leader-vip vip-${level}">${level > 0 ? escapeHtml(vipNameFor(level)) : 'Supporter'}</span>
+          </span>
+          <span class="leader-coins">💰 ${Number(item.coins || 0).toLocaleString('en-US')}</span>
+        </div>`;
+      })
       .join('');
+
+    const topName = top[0] && top[0].name;
+    if (topName && lastTopName && topName !== lastTopName) {
+      showNotice(`@${topName} is our new Top Supporter!`, 'vip');
+    }
+    lastTopName = topName || '';
+  }
+
+  // ------------------------------------------------------------- notifications
+  let noticeSeq = 0;
+  function showNotice(text, kind = 'thanks', duration = 3600) {
+    const stack = $('noticeStack');
+    if (!stack || !text) return;
+    const id = `notice_${++noticeSeq}`;
+    const el = document.createElement('div');
+    el.className = `notice ${kind}`;
+    el.id = id;
+    el.textContent = text;
+    stack.appendChild(el);
+    while (stack.children.length > 4) stack.removeChild(stack.firstChild);
+    setTimeout(() => {
+      const node = document.getElementById(id);
+      if (node) node.remove();
+    }, duration);
+  }
+
+  const celebrationSeen = new Set();
+  function celebrationOnce(key) {
+    if (celebrationSeen.has(key)) return false;
+    celebrationSeen.add(key);
+    if (celebrationSeen.size > 500) {
+      const first = celebrationSeen.values().next().value;
+      celebrationSeen.delete(first);
+    }
+    return true;
+  }
+
+  let bannerTimerLocal = null;
+  function showCelebrationBanner(title, sub, duration = 4200) {
+    if ($('partyTitle')) $('partyTitle').textContent = title;
+    if ($('partySub')) $('partySub').textContent = sub;
+    const banner = $('partyBanner');
+    if (!banner) return;
+    banner.classList.add('visible');
+    clearTimeout(bannerTimerLocal);
+    bannerTimerLocal = setTimeout(() => banner.classList.remove('visible'), duration);
+  }
+
+  function runCelebration(ev) {
+    const celebration = ev.celebration || {};
+    const tier = celebration.tier || 'none';
+    if (tier === 'none') return;
+    const key = `cel_${ev.orderId || ev.id || ev.user}_${tier}`;
+    if (!celebrationOnce(key)) return;
+
+    const coins = Number(ev.coins) || celebration.coins || 0;
+    const who = ev.user || 'a viewer';
+
+    if (tier === 'small') {
+      fx.confetti(50);
+      fx.sparkle(540, 900, 14);
+      audio.playCelebration();
+      showCelebrationBanner('🎉 THANK YOU!', `@${who} · ${coins} coins`, 3200);
+      game.cheerAll(0.8);
+    } else if (tier === 'gold') {
+      fx.confetti(110);
+      fx.sparkle(540, 860, 32);
+      audio.playCelebration();
+      showCelebrationBanner('✨ GOLDEN CELEBRATION ✨', `@${who} · ${coins} coins`, 4400);
+      game.cheerAll(1.3);
+    } else if (tier === 'fireworks') {
+      fx.fireworks(6);
+      fx.confetti(120);
+      audio.playFireworks();
+      showCelebrationBanner('🎆 VIP CELEBRATION 🎆', `@${who} · ${coins} coins`, 5200);
+      showNotice(`@${who} just became a VIP!`, 'vip');
+      game.cheerAll(2);
+    } else if (tier === 'grand') {
+      fx.fireworks(10);
+      fx.confetti(200);
+      fx.sparkle(540, 800, 60);
+      audio.playFireworks();
+      showCelebrationBanner('👑 GRAND CELEBRATION 👑', `Wow! Thank you @${who} · ${coins} coins`, 6500);
+      showNotice('Wow! Thank you for the amazing gift!', 'grand', 4600);
+      game.cheerAll(3);
+    }
   }
 
   function renderGiftTicker() {
@@ -218,11 +349,14 @@
         simBtn.textContent = `🤖 Auto Demo: ${autoSim ? 'ON' : 'OFF'}`;
         simBtn.classList.toggle('active-toggle', autoSim);
       }
+      if (typeof st.settings.sfxVolume === 'number') audio.setSfxVolume(st.settings.sfxVolume);
       audio.setMusicEnabled(st.settings.bgMusicEnabled !== false);
       audio.ttsEnabled = st.settings.ttsEnabled !== false;
       if (typeof st.settings.ttsLanguage === 'string') audio.ttsLanguage = st.settings.ttsLanguage;
       if (typeof st.settings.ttsVoice === 'string' && st.settings.ttsVoice) audio.ttsVoice = st.settings.ttsVoice;
       if (typeof st.settings.ttsSpeed === 'number') audio.ttsSpeed = st.settings.ttsSpeed;
+      // Announcements stop with the shop, and never talk over a paused game.
+      if (announcer) announcer.setPaused(Boolean(st.settings.paused) || st.settings.running === false);
       const ttsBtn = $('btnToggleTts');
       if (ttsBtn) {
         ttsBtn.textContent = `🎙️ Voice: ${audio.ttsEnabled ? 'ON' : 'OFF'}`;
@@ -300,9 +434,33 @@
     partyTimer = setTimeout(() => banner.classList.remove('visible'), 7000);
   }
 
+  function handleTestEvent(ev) {
+    if (!ev) return;
+    if (ev.type === 'vipUpgrade' || ev.vipLevel) {
+      audio.playVipUpgrade();
+      showNotice(`@${ev.user} just became a ${vipNameFor(ev.vipLevel)}!`, 'vip');
+      fx.sparkle(540, 900, 28);
+    }
+    if (ev.celebration && ev.celebration.tier !== 'none') {
+      runCelebration({ ...ev, orderId: `test_${ev.id}` });
+    }
+    game.cheerAll(1.2);
+  }
+
   function handleServerEvent(ev) {
     if (!ev) return;
+    if (ev.test) {
+      handleTestEvent(ev);
+      return;
+    }
     game.handleEvent(ev);
+    if (
+      announcer &&
+      ['giftOrder', 'partyOrder', 'followGuest', 'commentOrder', 'likeBurst', 'mysteryDrink'].includes(ev.type)
+    ) {
+      // Personalized replies take the stage first — no generic line right after.
+      announcer.notifyPersonalized();
+    }
 
     switch (ev.type) {
       case 'serveDrink':
@@ -319,6 +477,8 @@
       case 'freeDrink':
         audio.playParty();
         fx.hearts(760, 1040, 14);
+        fx.sparkle(760, 1000, 12);
+        showNotice(`@${ev.user} sent some love — VIP sparkle!`, 'vip');
         break;
       case 'likeBurst':
         audio.playHeartPop();
@@ -329,18 +489,34 @@
         fx.confetti(90);
         showPartyBanner(ev);
         break;
-      case 'giftOrder':
-        audio.playParty();
-        fx.confetti(70);
+      case 'giftOrder': {
+        audio.playCoin();
         showGiftBanner(ev);
+        if (celebrationOnce(`thanks_${ev.orderId || ev.id}`)) {
+          showNotice(`Thank you @${ev.user} for the support!`, 'thanks');
+        }
+        if (ev.vipUpgraded) {
+          audio.playVipUpgrade();
+          showNotice(`@${ev.user} just became a ${vipNameFor(ev.vipLevel)}!`, `vip vip-${Number(ev.vipLevel) || 1}`);
+          fx.sparkle(540, 940, 22);
+        }
+        if (ev.celebration) runCelebration(ev);
         break;
+      }
       case 'newGuest':
       case 'viewerJoin':
       case 'viewerReconnect':
         audio.playCupClink();
+        if (ev.type === 'viewerJoin') {
+          showNotice(`@${ev.user} joined the shop!`, 'join', 2800);
+          if (announcer) announcer.greetViewer(ev.user);
+        }
         break;
       case 'viewerLeave':
         audio.playServiceBell();
+        if (celebrationOnce(`leave_${ev.viewerId}_${ev.id}`)) {
+          showNotice(`@${ev.user} left — thanks for stopping by!`, 'join', 2800);
+        }
         break;
       default:
         break;
@@ -350,7 +526,8 @@
       audio.enqueueTts(ev.ttsText, {
         voice: ev.ttsVoice,
         language: ev.ttsLanguage,
-        speed: ev.ttsSpeed
+        speed: ev.ttsSpeed,
+        priority: ev.type === 'giftOrder' || ev.type === 'partyOrder' ? 0 : 1
       });
     }
     updateHud();
@@ -386,7 +563,8 @@
             voice: msg.params.voice,
             language: msg.params.language,
             speed: msg.params.speed,
-            url: msg.params.url
+            url: msg.params.url,
+            priority: 0
           });
         }
       }

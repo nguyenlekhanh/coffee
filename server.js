@@ -522,6 +522,7 @@ const DEFAULT_STATE = {
     sfxEnabled: true,
     musicVolume: 0.55,
     ttsVolume: 0.9,
+    sfxVolume: 0.85,
     autoSim: false,
     autoSimIntervalMs: 9000
   },
@@ -596,9 +597,12 @@ function getLeaderboard(limit = 6) {
       rank: index + 1,
       name: s.name,
       uniqueId: s.uniqueId,
+      avatar: s.avatar || '',
       coins: round2(s.coins || 0),
       drinks: s.drinks || 0,
-      gifts: s.gifts || 0
+      gifts: s.gifts || 0,
+      vipLevel: s.vipLevel || 0,
+      vipName: vipLevelFor(s.coins || 0).name
     }));
 }
 
@@ -733,6 +737,33 @@ function pickMysteryCard() {
 // 4b. VIEWER CHARACTER SYSTEM
 // One TikTok viewer = one persistent game character for the whole live session.
 // ============================================================================
+// VIP progression is driven by coins donated during the current live session.
+const VIP_LEVELS = [
+  { level: 0, key: 'regular', name: 'Regular Customer', min: 0 },
+  { level: 1, key: 'vip', name: 'VIP Customer', min: 25 },
+  { level: 2, key: 'super', name: 'Super VIP', min: 50 },
+  { level: 3, key: 'diamond', name: 'Diamond VIP', min: 100 }
+];
+
+function vipLevelFor(coins) {
+  const value = Number(coins) || 0;
+  let found = VIP_LEVELS[0];
+  for (const tier of VIP_LEVELS) {
+    if (value >= tier.min) found = tier;
+  }
+  return found;
+}
+
+// Individual gift coin value decides how big the celebration is.
+function celebrationFor(coins) {
+  const value = Number(coins) || 0;
+  if (value >= 500) return { tier: 'grand', label: 'GRAND CELEBRATION', coins: value };
+  if (value >= 100) return { tier: 'fireworks', label: 'VIP CELEBRATION', coins: value };
+  if (value >= 50) return { tier: 'gold', label: 'GOLDEN CELEBRATION', coins: value };
+  if (value >= 25) return { tier: 'small', label: 'CELEBRATION', coins: value };
+  return { tier: 'none', label: '', coins: value };
+}
+
 const VIEWER_LIMITS = { active: 12, visibleWaiting: 5, ttlMs: 15 * 60 * 1000 };
 const CUSTOMER_SPRITE_COUNT = 10;
 
@@ -757,6 +788,11 @@ function startLiveSession() {
   liveSession.drinks = 0;
   liveSession.served = 0;
   liveSession.supporters.clear();
+  // A new live session starts everyone back at Regular Customer.
+  for (const viewer of viewerSessions.values()) {
+    viewer.sessionCoins = 0;
+    viewer.vipLevel = 0;
+  }
 }
 startLiveSession();
 
@@ -804,7 +840,10 @@ function viewerSnapshot(viewer, rank = viewerRank(viewer)) {
     name: viewer.name,
     avatar: viewer.avatar,
     sprite: viewer.sprite,
-    vip: Boolean(viewer.vip),
+    vip: Boolean(viewer.vip) || (viewer.vipLevel || 0) > 0,
+    vipLevel: viewer.vipLevel || 0,
+    vipName: vipLevelFor(viewer.sessionCoins || 0).name,
+    sessionCoins: round2(viewer.sessionCoins || 0),
     coins: round2(viewer.coins),
     drinks: viewer.drinks,
     likes: viewer.likes,
@@ -848,6 +887,8 @@ function ensureViewer(params = {}) {
       lastSeenAt: now,
       leftAt: 0,
       coins: 0,
+      sessionCoins: 0,
+      vipLevel: 0,
       drinks: 0,
       likes: 0,
       comments: 0,
@@ -877,8 +918,10 @@ function ensureViewer(params = {}) {
 }
 
 function recordViewerStats(viewer, delta = {}) {
-  if (!viewer) return;
+  if (!viewer) return { levelUp: false, level: 0, previous: 0 };
+  const previous = viewer.vipLevel || 0;
   viewer.coins = round2(viewer.coins + (delta.coins || 0));
+  viewer.sessionCoins = round2((viewer.sessionCoins || 0) + (delta.coins || 0));
   viewer.drinks += delta.drinks || 0;
   viewer.likes += delta.likes || 0;
   viewer.comments += delta.comments || 0;
@@ -886,17 +929,25 @@ function recordViewerStats(viewer, delta = {}) {
   viewer.gifts += delta.gifts || 0;
   viewer.giftOrders += delta.giftOrders || 0;
 
+  const level = vipLevelFor(viewer.sessionCoins);
+  viewer.vipLevel = level.level;
+  if (level.level > 0) viewer.vip = true;
+
   liveSession.coins = round2(liveSession.coins + (delta.coins || 0));
   liveSession.drinks += delta.drinks || 0;
 
   const support =
     liveSession.supporters.get(viewer.id) ||
-    { name: viewer.name, uniqueId: viewer.uniqueId, coins: 0, drinks: 0, gifts: 0 };
+    { name: viewer.name, uniqueId: viewer.uniqueId, avatar: viewer.avatar || '', coins: 0, drinks: 0, gifts: 0, vipLevel: 0 };
   support.name = viewer.name;
+  support.avatar = viewer.avatar || '';
   support.coins = round2(support.coins + (delta.coins || 0));
   support.drinks += delta.drinks || 0;
   support.gifts += delta.gifts || 0;
+  support.vipLevel = level.level;
   liveSession.supporters.set(viewer.id, support);
+
+  return { levelUp: level.level > previous, level: level.level, previous, name: level.name };
 }
 
 // A viewer keeps a personal order queue; every gift appends to it.
@@ -959,6 +1010,13 @@ function getPublicState() {
       supporters: liveSession.supporters.size
     },
     viewers: activeViewers().map((viewer, index) => viewerSnapshot(viewer, index)),
+    vipSummary: {
+      total: activeViewers().filter((viewer) => (viewer.vipLevel || 0) > 0).length,
+      vip: activeViewers().filter((viewer) => (viewer.vipLevel || 0) === 1).length,
+      superVip: activeViewers().filter((viewer) => (viewer.vipLevel || 0) === 2).length,
+      diamond: activeViewers().filter((viewer) => (viewer.vipLevel || 0) === 3).length,
+      sessionDonations: round2(liveSession.coins)
+    },
     viewerSummary: {
       active: activeViewers().length,
       maxActive: VIEWER_LIMITS.active,
@@ -1180,7 +1238,9 @@ const Actions = {
     if (state.recentGifts.length > 12) state.recentGifts.length = 12;
 
     const { viewer } = ensureViewer({ user: supporter.name, uniqueId, avatar });
-    recordViewerStats(viewer, { coins, drinks: units, gifts: 1, giftOrders: 1 });
+    const stats = recordViewerStats(viewer, { coins, drinks: units, gifts: 1, giftOrders: 1 });
+    const vipInfo = vipLevelFor(viewer.sessionCoins);
+    const celebration = celebrationFor(coinsPerGift);
     for (let i = 0; i < units; i++) {
       enqueueViewerOrder(viewer, {
         id: i === 0 ? giftEntry.id : `${giftEntry.id}_${i}`,
@@ -1199,6 +1259,12 @@ const Actions = {
       viewerId: viewer.id,
       orderId: giftEntry.id,
       pendingOrders: viewer.orders.length,
+      vipLevel: vipInfo.level,
+      vipName: vipInfo.name,
+      vipUpgraded: stats.levelUp,
+      previousVipLevel: stats.previous,
+      sessionCoins: round2(viewer.sessionCoins),
+      celebration,
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -1262,6 +1328,10 @@ const Actions = {
       type: 'partyOrder',
       viewerId: viewer.id,
       pendingOrders: viewer.orders.length,
+      vipLevel: viewer.vipLevel || 0,
+      vipName: vipLevelFor(viewer.sessionCoins || 0).name,
+      sessionCoins: round2(viewer.sessionCoins || 0),
+      celebration: celebrationFor(coins),
       user: supporter.name,
       uniqueId: supporter.uniqueId,
       avatar: supporter.avatar,
@@ -1471,6 +1541,30 @@ const Actions = {
     };
   },
 
+  // Admin test buttons: same celebration/VIP visuals, no leaderboard side effects.
+  testVip(params = {}) {
+    const coins = Math.round(clamp(Number(params.coins) || 25, 1, 5000));
+    const level = vipLevelFor(coins);
+    const celebration = celebrationFor(coins);
+    const isCelebration = params.kind === 'celebration' || coins >= 500;
+    const event = pushEventLog({
+      type: isCelebration ? 'donationCelebration' : 'vipUpgrade',
+      test: true,
+      user: 'Test Supporter',
+      uniqueId: 'test.supporter',
+      avatar: '',
+      coins,
+      vipLevel: level.level,
+      vipName: level.name,
+      vipUpgraded: true,
+      celebration,
+      message: isCelebration ? `${coins} coin test celebration` : `${level.name} test`,
+      ttsText: ''
+    });
+    broadcastNotification('temple.event', { event, state: getPublicState() });
+    return { ok: true, event };
+  },
+
   newGuest(params = {}) {
     const name = sanitizeUserName(params.user || params.uniqueId || 'Guest');
     const uniqueId = params.uniqueId || '';
@@ -1503,6 +1597,7 @@ const Actions = {
     if (typeof params.spawnRate === 'number') next.spawnRate = clamp(params.spawnRate, 0.25, 3);
     if (typeof params.musicVolume === 'number') next.musicVolume = clamp(params.musicVolume, 0, 1);
     if (typeof params.ttsVolume === 'number') next.ttsVolume = clamp(params.ttsVolume, 0, 1);
+    if (typeof params.sfxVolume === 'number') next.sfxVolume = clamp(params.sfxVolume, 0, 1);
     if (typeof params.autoSimIntervalMs === 'number') {
       next.autoSimIntervalMs = clamp(params.autoSimIntervalMs, 3000, 60000);
     }
@@ -2024,6 +2119,14 @@ async function handleRpcCall(method, params = {}) {
     case 'shop.viewers':
     case 'live.viewers':
       return Actions.viewerRoster();
+
+    case 'shop.testVip':
+    case 'live.testVip':
+      return Actions.testVip(params);
+
+    case 'shop.testCelebration':
+    case 'live.testCelebration':
+      return Actions.testVip({ ...params, kind: 'celebration' });
 
     case 'live.connect':
       return await connectTikTokLive(params.username);
