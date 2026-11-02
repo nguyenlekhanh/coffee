@@ -6,8 +6,11 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(window.location.search);
-  if (params.get('obs') === '1') document.body.classList.add('obs-mode');
+  document.body.classList.add('obs-mode');
 
+  const isAdminMode = params.get('adminMode') === '1';
+  if (isAdminMode) document.body.classList.remove('obs-mode');
+  
   // ---------------------------------------------------------------- stage fit
   const stageWrapper = $('stageWrapper');
   const stage9x16 = $('stage9x16');
